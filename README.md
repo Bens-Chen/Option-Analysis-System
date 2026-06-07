@@ -1,27 +1,43 @@
 # Option-Pricing
-This repository is about introduction and code of different methods and some techniques to price options.
-# Standard Methods
-## Black-Scholes
-The most tyipical one with closed form. If options' payoff aren't the same as vanilla call or put, we can still use Martingale Pricing Method to get it's closed form.
 
-## CRR - O(n^2) and O(n)
-One can seem to be the most versatile to price not only European,American , but also some other exotic options like: Asian,Lookback....Although the logic is similar, the  code are different when pricing different option.
+This repository is some introductions and codes of different methods and some techniques to price options.
 
-Here are two versions with different required Quadratic time
+## Standard Methods
+### Black-Scholes
 
-## Monte-Carlo
+The most tyipical one with closed form. If options' payoff aren't the same as vanilla call or put, we can still use a simple way (compared to derive from PDE)Martingale Pricing Method to get it's closed form.
+
+Martingale Pricing Method is an alternative method to derive Black-Scholes like formulas.The most difficult part is how to change P measure to Q measure, however, due to RNVR, we know that P measure is equivalent to Q measure when pricing.Then by applying Girsanov Theorem and some calculations we can easily get the closed form of any European options.
+
+### CRR 
+
+One can seem to be the most versatile to price not only European,American , but also some other exotic options like: Asian,Lookback....Although the logic is similar, the code are different when pricing different option.
+
+Here are two simple versions to pricing European and American with different required Quadratic time
+O(n^2)
+O(n)
+
+### Monte-Carlo
+
+Different to the previous two methods,Monte-Carlo can't derice exact price, but can give users a confidence interval.This method is more like a method to validate or assure ur outcome is reasonable.
+
+In addition, in oreder to get a more narrow interval ,we can use some variance reduction method, such as moment matching, antithetic variate approach, control variates and Emperical Martingale Simulations(EMS).
+
+Here's easy introduction of each variane reduction method.
+- Moment Matching: Matching the first two moments of the SND,mean equals to 0, variance equal to 1
+- Antithetic Variate Approach: Get mean equals to 0, the logic is to sample first half of sample, then latter half will be the negaitve of  first half.
+- Control Variates: 
+
+
+### Finite Difference
+
+## Advanced Methods
+### CRR combined with Black-Scholes(to achieve faster convergence)
+### Combinatorial methods (like BS could only be applied on European)
 
 
 
-
-
-# Advanced Methods
-## CRR combined with Black-Scholes(to achieve faster convergence)
-## Combinatorial methods (like BS could only be applied on European)
-## Variation Reduction
-
-
-# Exotic Options
+##Exotic Options
 
 
 
