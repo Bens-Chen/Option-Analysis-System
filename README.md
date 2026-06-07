@@ -13,9 +13,9 @@ Martingale Pricing Method is an alternative method to derive Black-Scholes like 
 
 One can seem to be the most versatile to price not only European,American , but also some other exotic options like: Asian,Lookback....Although the logic is similar, the code are different when pricing different option.
 
-Here are two simple versions   with different required Quadratic time
--O(n^2) 
--O(n)
+Here are two simple versions  with different dimension usage
+- O(n^2) 
+- O(n)
 
 And also here provide other methods similar to CRR or be combined with CRR.
 - Combinatorial(only European)
