@@ -88,8 +88,11 @@ Asian Option is also a path dependent option.Here are some features of this opti
 - The volatility of Asian is lower than the underlying assets,so it is cheaper and more attractive to some investors.
 - Useful in third-traded markets to prevent manipulation
 
-And there is the other option which is similar to Asian:Average Option. Take call as example,Payoff of Average: $\max(S_{\mathrm{ave},T} - K, 0)$
-Asian: $\max(S_T - S_{\mathrm{ave},t}, 0)$
+And there is the other option which is similar to Asian:Average Option. Take call as example,Payoff of 
+
+- Average: $\max(S_{\mathrm{ave},T} - K, 0)$
+
+- Asian: $\max(S_T - S_{\mathrm{ave},t}, 0)$
 
 For simplicity, the code will be Average Option
 
@@ -108,7 +111,7 @@ Volatility can be easily derived by using past data,however,the volatility of op
 Define Implied voliltility satisfying
 
 $$
-f(\sigma^{*}) = c(S_0,K,r,q,\sigma^{*},T) - \text{market option price} = 0
+f(\sigma_{imp}) = c(S_0,K,r,q,\sigma_{imp},T) - C_{market} = 0
 $$
 
 Here two ways to solve.
