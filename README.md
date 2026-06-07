@@ -14,8 +14,8 @@ Martingale Pricing Method is an alternative method to derive Black-Scholes like 
 One can seem to be the most versatile to price not only European,American , but also some other exotic options like: Asian,Lookback....Although the logic is similar, the code are different when pricing different option.
 
 Here are two simple versions  with different dimension usage
-- O(n^2) 
-- O(n)
+- n^2 
+- n
 
 And also here provide other methods similar to CRR or be combined with CRR.
 - Combinatorial(only European)
@@ -54,16 +54,33 @@ The implicit method is more robust than explicit because explicit needs an exter
 
 ## Exotic Options
 ### Rainbow Option
-Rainbow Call's payoff is max(max(S1,S2,....)-K,0) and here we will use Monte-Carlo to price and the interesting part is because every asset might have some relationship to others,so we need to introduce Cholesky decompostion to erase their relation.There is package of Cholesky decomposition in Python(numpy.linalg.cholesky()),but we will also provide the algorithm.
+
+Rainbow Call's payoff is max(max(S1,S2,....)-K,0) and here we will use Monte-Carlo to price and the interesting part is because every asset might have some relationship to others,so we need to introduce Cholesky decompostion to erase their relation.There is package of Cholesky decomposition in Python(numpy.linalg.cholesky()),but we will still provide the algorithm.
 
 ### LookBack Option
 
+Lookback Option is one of path dependent options and Put's payoff is max(Smax,tau - S tau,0), where Smax,tau is max Su, for u = 0,delta_t,2*delta_t.....Here we apply CRR and Monte-Carlo.
+
+note:Smax is max Su before t, Smax is max in 0 ~ t, t is our pricing date, so we still need to get Smax,tau in t ~ T.
+
 ### Asian Option
 
+Asian Option is also a path dependent option.Here are some features of this option:
+- Serve as a hadging tool to who will be exposed to the risk of average prices.
+- The volatility of Asian is lower than the underlying assets,so it is cheaper and more attractive to some investors.
+- Useful in third-traded markets to prevent manipulation
+
+And there is the other option which is similar to Asian:Average Option. Take call as example,Payoff of Average:max(Save,T - K, 0)
+Asian:max(ST - Save,t , 0)
+
+For simplicity, the code will be Average Option
+
+The hardest part is to derive every nodes A and because the average price before might not occur in next step's node, we need to use interpolation.
 
 
-
-
+## Estimation and Calibration
+### Mean
+### Variance
 
 
 
