@@ -18,8 +18,8 @@ Here are two simple versions   with different required Quadratic time
 -O(n)
 
 And also here provide other methods similar to CRR or be combined with CRR.
--Combinatorial(only European)
--Binomial Black-Scholes: Apply BS formula on n-1 step, we can easily reduce the time to converge 
+- Combinatorial(only European)
+- Binomial Black-Scholes: Apply BS formula on n-1 step, we can easily reduce the time to converge 
 
 ### Monte-Carlo
 
