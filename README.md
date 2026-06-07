@@ -53,6 +53,12 @@ The implicit method is more robust than explicit because explicit needs an exter
 
 
 ## Exotic Options
+### Rainbow Option
+Rainbow Call's payoff is max(max(S1,S2,....)-K,0) and here we will use Monte-Carlo to price and the interesting part is because every asset might have some relationship to others,so we need to introduce Cholesky decompostion to erase their relation.There is package of Cholesky decomposition in Python(numpy.linalg.cholesky()),but we will also provide the algorithm.
+
+### LookBack Option
+
+### Asian Option
 
 
 
