@@ -80,7 +80,11 @@ The hardest part is to derive every nodes A and because the average price before
 
 ## Estimation and Calibration
 ### Mean
-### Variance
+- E(ln(ST/S0)) : geometic mean of daily returns, derive u - 0.5 * sigma^2 ,correct mean and std when we assume stock price follow lognormal
+- ln(E[ST/S0]) : arithmetic mean of daily returns,derive u , not the correct one
+
+### Implied Volatility
+
 
 
 
