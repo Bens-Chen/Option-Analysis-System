@@ -27,9 +27,7 @@ Here's easy introduction of each variane reduction method.
 
 - Antithetic Variate Approach: Get mean equals to 0, the logic is to sample first half, then latter half will be the negaitve of first half.
 
-- Control Variates[Kemna and Vorst(1990)]: A more complicated method. It requires u to get a similar, relevent underlying asset or derivative.Over all, u need to asumme  W = X+B(Y-u), and find Y which has mean equals to u, and Var(W) = Var(X) + 2BCov(X,Y) + B^2 *Var(Y) ,where 2BCov(X,Y) + B^2 *Var(Y) < 0.
-
-The first difficulty is  find the true mean of Y (not sample mean) and the second is decide B because B = Cov(X,Y)/Var(Y), but due to X and Y are both dependent on drawn samples, the estimators might be affected.
+- Control Variates[Kemna and Vorst(1990)]: A more complicated method. It requires u to get a similar, relevent underlying asset or derivative.Over all, u need to asumme  W = X+B(Y-u), and find Y which has mean equals to u, and Var(W) = Var(X) + 2BCov(X,Y) + B^2 *Var(Y) ,where 2BCov(X,Y) + B^2 *Var(Y) < 0.The first difficulty is  find the true mean of Y (not sample mean) and the second is decide B because B = Cov(X,Y)/Var(Y), but due to X and Y are both dependent on drawn samples, the estimators might be affected.
 
 -  EMS[Duan and Siminato(1998)]: a method performs better than others when pricing path dependent options.The logic is to adjust price to conform to martingale.
 
@@ -41,7 +39,7 @@ This method is proposed to solve PDE.It has two way ,one is Implicit, the other 
 Similar to CRR, we divide discretize time but also Stock price,Fij means option price when time i and stock price j, and if the grid is small enough, it is equivalent to derive closed form.
 
 - Implicit: node Fi+1,j derived from Fi,j+1 , Fi,j , Fi, j-1 three nodes.
- "aj*Fi,j+1 +bj*Fi,j+cj*Fi,j-1 = Fi+1,j"
+ $$aj*Fi,j+1 +bj*Fi,j+cj*Fi,j-1 = Fi+1,j$$
  aj = 
  bj = 
  cj = 
