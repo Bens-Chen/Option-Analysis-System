@@ -59,9 +59,9 @@ Rainbow Call's payoff is max(max(S1,S2,....)-K,0) and here we will use Monte-Car
 
 ### LookBack Option
 
-Lookback Option is one of path dependent options and Put's payoff is max(Smax,tau - S tau,0), where Smax,tau is max Su, for u = 0,delta_t,2*delta_t.....Here we apply CRR and Monte-Carlo.
+Lookback Option is one of path dependent options and Put's payoff is $$max(Smax,tau - S tau,0)$$, where Smax,tau is max Su, for u = 0,$$delta_t$$,$$2*delta_t$$.....Here we apply CRR and Monte-Carlo.
 
-note:Smax is max Su before t, Smax is max in 0 ~ t, t is our pricing date, so we still need to get Smax,tau in t ~ T.
+note:$$Smax$$ is $$max(Su)$$ before $$t$$, $$Smax$$ is max in 0 ~ t, t is our pricing date, so we still need to get $$Smax,tau$$ in t ~ T.
 
 ### Asian Option
 
@@ -70,8 +70,8 @@ Asian Option is also a path dependent option.Here are some features of this opti
 - The volatility of Asian is lower than the underlying assets,so it is cheaper and more attractive to some investors.
 - Useful in third-traded markets to prevent manipulation
 
-And there is the other option which is similar to Asian:Average Option. Take call as example,Payoff of Average:max(Save,T - K, 0)
-Asian:max(ST - Save,t , 0)
+And there is the other option which is similar to Asian:Average Option. Take call as example,Payoff of Average:$$max(Save,T - K, 0)$$
+Asian:$$max(ST - Save,t , 0)$$
 
 For simplicity, the code will be Average Option
 
@@ -81,7 +81,7 @@ The hardest part is to derive every nodes A and because the average price before
 ## Estimation and Calibration
 ### Mean
 - $$E(ln(ST/S0))$$ : geometic mean of daily returns, derive u - 0.5 * sigma^2 ,correct mean and std when we assume stock price follow lognormal
-- ln(E[ST/S0]) : arithmetic mean of daily returns,derive u , not the correct one
+- $$ln(E[ST/S0])$$ : arithmetic mean of daily returns,derive u , not the correct one
 
 ### Implied Volatility
 
