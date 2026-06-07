@@ -2,7 +2,7 @@
 
 This repository is some introductions and codes of different methods and some techniques to price options.
 
-## Standard Methods
+## Methods
 ### Black-Scholes
 
 The most tyipical one with closed form. If options' payoff aren't the same as vanilla call or put, we can still use a simple way (compared to derive from PDE)Martingale Pricing Method to get it's closed form.
@@ -13,8 +13,13 @@ Martingale Pricing Method is an alternative method to derive Black-Scholes like 
 
 One can seem to be the most versatile to price not only European,American , but also some other exotic options like: Asian,Lookback....Although the logic is similar, the code are different when pricing different option.
 
-Here are two simple versions to pricing European and American with different required Quadratic time
-O(n^2) and O(n)
+Here are two simple versions   with different required Quadratic time
+-O(n^2) 
+-O(n)
+
+And also here provide other methods similar to CRR or be combined with CRR.
+-Combinatorial(only European)
+-Binomial Black-Scholes: Apply BS formula on n-1 step, we can easily reduce the time to converge 
 
 ### Monte-Carlo
 
@@ -38,17 +43,12 @@ This method is proposed to solve PDE.It has two way ,one is Implicit, the other 
 
 Similar to CRR, we divide discretize time but also Stock price,Fij means option price when time i and stock price j, and if the grid is small enough, it is equivalent to derive closed form.
 
-- Implicit: node Fi+1,j derived from Fi,j+1 , Fi,j , Fi, j-1 three nodes.
- $$aj*Fi,j+1 +bj*Fi,j+cj*Fi,j-1 = Fi+1,j$$
- aj = 
- bj = 
- cj = 
+- Implicit: node Fi+1,j derived from Fi,j+1 , Fi,j , Fi, j-1 three nodes. 
+- Explicit: node Fi,j derived from Fi+1,j+1 , Fi+1,j , Fi+1, j-1 three nodes.
+
+The implicit method is more robust than explicit because explicit needs an extermely small delta_t for obtaining convergent results.
 
 
-
-## Advanced Methods
-### CRR combined with Black-Scholes(to achieve faster convergence)
-### Combinatorial methods (like BS could only be applied on European)
 
 
 
