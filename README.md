@@ -14,8 +14,7 @@ Martingale Pricing Method is an alternative method to derive Black-Scholes like 
 One can seem to be the most versatile to price not only European,American , but also some other exotic options like: Asian,Lookback....Although the logic is similar, the code are different when pricing different option.
 
 Here are two simple versions to pricing European and American with different required Quadratic time
-O(n^2)
-O(n)
+O(n^2) and O(n)
 
 ### Monte-Carlo
 
@@ -25,8 +24,10 @@ In addition, in oreder to get a more narrow interval ,we can use some variance r
 
 Here's easy introduction of each variane reduction method.
 - Moment Matching: Matching the first two moments of the SND,mean equals to 0, variance equal to 1
-- Antithetic Variate Approach: Get mean equals to 0, the logic is to sample first half of sample, then latter half will be the negaitve of  first half.
-- Control Variates: 
+- Antithetic Variate Approach: Get mean equals to 0, the logic is to sample first half, then latter half will be the negaitve of first half.
+- Control Variates[Kemna and Vorst(1990)]: A more complicated method. It requires u to get a similar, relevent underlying asset or derivative.Over all, u need to asumme  W = X+B(Y-u), and find Y which has mean equals to u, and Var(W) = Var(X) + 2BCov(X,Y) + B^2 *Var(Y) ,where 2BCov(X,Y) + B^2 *Var(Y) < 0.
+The first difficulty is  find the true mean of Y (not sample mean) and the second is decide B because B = Cov(X,Y)/Var(Y), but due to X and Y are both dependent on drawn samples, the estimators might be affected.
+-  EMS[Duan and Siminato(1998)]: a method performs better than others when pricing path dependent options.
 
 
 ### Finite Difference
@@ -37,7 +38,7 @@ Here's easy introduction of each variane reduction method.
 
 
 
-##Exotic Options
+## Exotic Options
 
 
 
