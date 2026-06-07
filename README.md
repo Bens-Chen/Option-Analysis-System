@@ -14,12 +14,12 @@ Martingale Pricing Method is an alternative method to derive Black-Scholes like 
 One can seem to be the most versatile to price not only European,American , but also some other exotic options like: Asian,Lookback....Although the logic is similar, the code are different when pricing different option.
 
 Here are two simple versions  with different dimension usage
-- n^2 
-- n
+- $n^2$
+- $n$
 
 And also here provide other methods similar to CRR or be combined with CRR.
 - Combinatorial(only European)
-- Binomial Black-Scholes: Apply BS formula on n-1 step, we can easily reduce the time to converge 
+- Binomial Black-Scholes: Apply BS formula on $n-1$ step, we can easily reduce the time to converge 
 
 ### Monte-Carlo
 
@@ -28,25 +28,41 @@ Different to the previous two methods,Monte-Carlo can't derice exact price, but 
 In addition, in order to get a more narrow interval ,we can use some variance reduction methods, such as moment matching, antithetic variate approach, control variates and Emperical Martingale Simulations(EMS).
 
 Here's easy introduction of each variane reduction method.
-- Moment Matching: Matching the first two moments of the SND,mean equals to 0, variance equal to 1
+#### Moment Matching: 
 
-- Antithetic Variate Approach: Get mean equals to 0, the logic is to sample first half, then latter half will be the negaitve of first half.
+Matching the first two moments of the SND,mean equals to 0, variance equal to 1
 
-- Control Variates[Kemna and Vorst(1990)]: A more complicated method. It requires u to get a similar, relevent underlying asset or derivative.Over all, u need to asumme  W = X+B(Y-u), and find Y which has mean equals to u, and Var(W) = Var(X) + 2BCov(X,Y) + B^2 *Var(Y) ,where 2BCov(X,Y) + B^2 *Var(Y) < 0.The first difficulty is  find the true mean of Y (not sample mean) and the second is decide B because B = Cov(X,Y)/Var(Y), but due to X and Y are both dependent on drawn samples, the estimators might be affected.
+#### Antithetic Variate Approach: 
 
--  EMS[Duan and Siminato(1998)]: a method performs better than others when pricing path dependent options.The logic is to adjust price to conform to martingale.
+Get mean equals to 0, the logic is to sample first half, then latter half will be the negaitve of first half.
+
+#### Control Variates[Kemna and Vorst(1990)]:
+
+ A more complicated method. It requires u to get a similar, relevent underlying asset or derivative.Over all, u need to asumme $W = X + B(Y - \mu)$, and find $Y$ which has mean equals to $\mu$, and
+
+$$
+\operatorname{Var}(W) = \operatorname{Var}(X) + 2B\operatorname{Cov}(X,Y) + B^2\operatorname{Var}(Y)
+$$
+
+where $2B\operatorname{Cov}(X,Y) + B^2\operatorname{Var}(Y) < 0$.
+ 
+ The first difficulty is  find the true mean of $Y$ (not sample mean) and the second is decide $B$ because $B = \operatorname{Cov}(X,Y)/\operatorname{Var}(Y)$, but due to $X$ and $Y$ are both dependent on drawn samples, the estimators might be affected.
+
+####  EMS[Duan and Siminato(1998)]: 
+
+A method performs better than others when pricing path dependent options.The logic is to adjust price to conform to martingale.
 
 
 ### Finite Difference
 
 This method is proposed to solve PDE.It has two way ,one is Implicit, the other is Explicit
 
-Similar to CRR, we divide discretize time but also Stock price,Fij means option price when time i and stock price j, and if the grid is small enough, it is equivalent to derive closed form.
+Similar to CRR, we divide discretize time but also Stock price,$F_{i,j}$ means option price when time $i$ and stock price $j$, and if the grid is small enough, it is equivalent to derive closed form.
 
-- Implicit: node Fi+1,j derived from Fi,j+1 , Fi,j , Fi, j-1 three nodes. 
-- Explicit: node Fi,j derived from Fi+1,j+1 , Fi+1,j , Fi+1, j-1 three nodes.
+- Implicit: node $F_{i+1,j}$ derived from $F_{i,j+1}$, $F_{i,j}$, $F_{i,j-1}$ three nodes. 
+- Explicit: node $F_{i,j}$ derived from $F_{i+1,j+1}$, $F_{i+1,j}$, $F_{i+1,j-1}$ three nodes.
 
-The implicit method is more robust than explicit because explicit needs an extermely small delta_t for obtaining convergent results.
+The implicit method is more robust than explicit because explicit needs an extermely small $\Delta t$ for obtaining convergent results.
 
 
 
@@ -55,13 +71,15 @@ The implicit method is more robust than explicit because explicit needs an exter
 ## Exotic Options
 ### Rainbow Option
 
-Rainbow Call's payoff is max(max(S1,S2,....)-K,0) and here we will use Monte-Carlo to price and the interesting part is because every asset might have some relationship to others,so we need to introduce Cholesky decompostion to erase their relation.There is package of Cholesky decomposition in Python(numpy.linalg.cholesky()),but we will still provide the algorithm.
+Rainbow Call's payoff is $\max(\max(S_1,S_2,\ldots) - K, 0)$ and here we will use Monte-Carlo to price and the interesting part is because every asset might have some relationship to others,so we need to introduce Cholesky decompostion to erase their relation.
+
+There is package of Cholesky decomposition in Python(numpy.linalg.cholesky()),but we will still provide the algorithm.
 
 ### LookBack Option
 
-Lookback Option is one of path dependent options and Put's payoff is $$max(Smax,tau - S tau,0)$$, where Smax,tau is max Su, for u = 0,$$delta_t$$,$$2*delta_t$$.....Here we apply CRR and Monte-Carlo.
+Lookback Option is one of path dependent options and Put's payoff is $\max(S_{\max,\tau} - S_{\tau}, 0)$, where $S_{\max,\tau}$ is $\max S_u$, for $u = 0, \Delta t, 2\Delta t, \ldots$.Here we apply CRR and Monte-Carlo.
 
-note:$$Smax$$ is $$max(Su)$$ before $$t$$, $$Smax$$ is max in 0 ~ t, t is our pricing date, so we still need to get $$Smax,tau$$ in t ~ T.
+note:$S_{\max}$ is $\max(S_u)$ before $t$, $S_{\max}$ is max in $0 \sim t$, $t$ is our pricing date, so we still need to get $S_{\max,\tau}$ in $t \sim T$.
 
 ### Asian Option
 
@@ -70,22 +88,43 @@ Asian Option is also a path dependent option.Here are some features of this opti
 - The volatility of Asian is lower than the underlying assets,so it is cheaper and more attractive to some investors.
 - Useful in third-traded markets to prevent manipulation
 
-And there is the other option which is similar to Asian:Average Option. Take call as example,Payoff of Average:$$max(Save,T - K, 0)$$
-Asian:$$max(ST - Save,t , 0)$$
+And there is the other option which is similar to Asian:Average Option. Take call as example,Payoff of Average: $\max(S_{\operatorname{ave},T} - K, 0)$
+Asian: $\max(S_T - S_{\operatorname{ave},t}, 0)$
 
 For simplicity, the code will be Average Option
 
-The hardest part is to derive every nodes A and because the average price before might not occur in next step's node, we need to use interpolation.
+The hardest part is to derive every nodes $A$ and because the average price before might not occur in next step's node, we need to use interpolation.
 
 
 ## Estimation and Calibration
 ### Mean
-- $$E(ln(ST/S0))$$ : geometic mean of daily returns, derive u - 0.5 * sigma^2 ,correct mean and std when we assume stock price follow lognormal
-- $$ln(E[ST/S0])$$ : arithmetic mean of daily returns,derive u , not the correct one
+- $E(\ln(S_T/S_0))$ : geometic mean of daily returns, derive $\mu - 0.5\sigma^2$, correct mean and std when we assume stock price follow lognormal
+- $\ln(E[S_T/S_0])$ : arithmetic mean of daily returns,derive $\mu$, not the correct one
 
 ### Implied Volatility
 
-Volatility can be easily derived by using past data,however,the volatility of options is considered to has forward looking information.Hence,we can't dirctly use historical sigma
+Volatility can be easily derived by using past data,however,the volatility of options is considered to has forward looking information.Hence,we can't dirctly use historical $\sigma$ as volatility.
+
+Define Implied voliltility satisfying
+
+$$
+f(\sigma^*) = c(S_0,K,r,q,\sigma^*,T) - \text{market option price} = 0
+$$
+
+Here two ways to solve.
+
+#### Bisection Method:
+
+First find $[a_n,b_n]$ such that $f(a_n)f(b_n)<0$. The steps to find $[a_{n+1},b_{n+1}]$ are :
+- (1)Calculate $x_n = a_n +(b_n - a_n)/2$
+- (2)If $f(a_n)f(x_n) < 0$ => $a_{n+1} = a_n$, $b_{n+1} = x_n$, else $a_{n+1} = x_n$, $b_{n+1} = b_n$
 
 
+#### Newton's Method:
+
+$$
+x_{n+1} = x_n - \frac{f(x_n)}{f'(x_n)}
+$$
+
+Based on first order Taylor-Series
 
