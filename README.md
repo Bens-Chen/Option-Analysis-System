@@ -14,7 +14,7 @@ Martingale Pricing Method is an alternative method to derive Black-Scholes like 
 One can seem to be the most versatile to price not only European,American , but also some other exotic options like: Asian,Lookback....Although the logic is similar, the code are different when pricing different option.
 
 Here are two simple versions  with different dimension usage
-- $n^2$
+- $n^{2}$
 - $n$
 
 And also here provide other methods similar to CRR or be combined with CRR.
@@ -41,12 +41,12 @@ Get mean equals to 0, the logic is to sample first half, then latter half will b
  A more complicated method. It requires u to get a similar, relevent underlying asset or derivative.Over all, u need to asumme $W = X + B(Y - \mu)$, and find $Y$ which has mean equals to $\mu$, and
 
 $$
-\operatorname{Var}(W) = \operatorname{Var}(X) + 2B\operatorname{Cov}(X,Y) + B^2\operatorname{Var}(Y)
+\mathrm{Var}(W) = \mathrm{Var}(X) + 2B\mathrm{Cov}(X,Y) + B^{2}\mathrm{Var}(Y)
 $$
 
-where $2B\operatorname{Cov}(X,Y) + B^2\operatorname{Var}(Y) < 0$.
+where $2B\mathrm{Cov}(X,Y) + B^{2}\mathrm{Var}(Y) < 0$.
  
- The first difficulty is  find the true mean of $Y$ (not sample mean) and the second is decide $B$ because $B = \operatorname{Cov}(X,Y)/\operatorname{Var}(Y)$, but due to $X$ and $Y$ are both dependent on drawn samples, the estimators might be affected.
+ The first difficulty is  find the true mean of $Y$ (not sample mean) and the second is decide $B$ because $B = \mathrm{Cov}(X,Y)/\mathrm{Var}(Y)$, but due to $X$ and $Y$ are both dependent on drawn samples, the estimators might be affected.
 
 ####  EMS[Duan and Siminato(1998)]: 
 
@@ -77,9 +77,9 @@ There is package of Cholesky decomposition in Python(numpy.linalg.cholesky()),bu
 
 ### LookBack Option
 
-Lookback Option is one of path dependent options and Put's payoff is $\max(S_{\max,\tau} - S_{\tau}, 0)$, where $S_{\max,\tau}$ is $\max S_u$, for $u = 0, \Delta t, 2\Delta t, \ldots$.Here we apply CRR and Monte-Carlo.
+Lookback Option is one of path dependent options and Put's payoff is $\max(S_{\max,\tau} - S_{\tau}, 0)$, where $S_{\max,\tau}$ is the maximum value of $S_u$ for $u = 0, \Delta t, 2\Delta t, \ldots$.Here we apply CRR and Monte-Carlo.
 
-note:$S_{\max}$ is $\max(S_u)$ before $t$, $S_{\max}$ is max in $0 \sim t$, $t$ is our pricing date, so we still need to get $S_{\max,\tau}$ in $t \sim T$.
+Note: $S_{\max}$ is the maximum value of $S_u$ from $0$ to $t$. Since $t$ is our pricing date, we still need to calculate $S_{\max,\tau}$ from $t$ to $T$.
 
 ### Asian Option
 
@@ -88,8 +88,8 @@ Asian Option is also a path dependent option.Here are some features of this opti
 - The volatility of Asian is lower than the underlying assets,so it is cheaper and more attractive to some investors.
 - Useful in third-traded markets to prevent manipulation
 
-And there is the other option which is similar to Asian:Average Option. Take call as example,Payoff of Average: $\max(S_{\operatorname{ave},T} - K, 0)$
-Asian: $\max(S_T - S_{\operatorname{ave},t}, 0)$
+And there is the other option which is similar to Asian:Average Option. Take call as example,Payoff of Average: $\max(S_{\mathrm{ave},T} - K, 0)$
+Asian: $\max(S_T - S_{\mathrm{ave},t}, 0)$
 
 For simplicity, the code will be Average Option
 
@@ -98,7 +98,7 @@ The hardest part is to derive every nodes $A$ and because the average price befo
 
 ## Estimation and Calibration
 ### Mean
-- $E(\ln(S_T/S_0))$ : geometic mean of daily returns, derive $\mu - 0.5\sigma^2$, correct mean and std when we assume stock price follow lognormal
+- $E(\ln(S_T/S_0))$ : geometic mean of daily returns, derive $\mu - 0.5\sigma^{2}$, correct mean and std when we assume stock price follow lognormal
 - $\ln(E[S_T/S_0])$ : arithmetic mean of daily returns,derive $\mu$, not the correct one
 
 ### Implied Volatility
@@ -108,7 +108,7 @@ Volatility can be easily derived by using past data,however,the volatility of op
 Define Implied voliltility satisfying
 
 $$
-f(\sigma^*) = c(S_0,K,r,q,\sigma^*,T) - \text{market option price} = 0
+f(\sigma^{*}) = c(S_0,K,r,q,\sigma^{*},T) - \text{market option price} = 0
 $$
 
 Here two ways to solve.
@@ -127,4 +127,3 @@ x_{n+1} = x_n - \frac{f(x_n)}{f'(x_n)}
 $$
 
 Based on first order Taylor-Series
-
