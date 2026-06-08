@@ -258,13 +258,15 @@ $\theta  = \frac{\partial c}{\partial T}$
 
 ### The relationship among $\Delta$ , $\gamma$ , $\theta$
 
-**By PDE:**
+By PDE:
+
   $$\frac{\partial f}{\partial t} + (r-q)S\frac{\partial f}{\partial S} + \frac{1}{2}\sigma^2S^2 \frac{\partial^2 f}{\partial S^2} = rf $$
 
-**and the definitions of $\Delta$ , $\gamma$ and $\theta$ ,we can derie**
+and the definitions of $\Delta$ , $\gamma$ and $\theta$ ,we can derie
+
   $$\theta + (r-q)S\Delta + \frac{1}{2}\sigma^2S^2 \gamma = rf $$
 
-**If we know any three of $\Delta$ , $\gamma$ , $\theta$ and the value of f, we can easily get the unknown one.Moreover, if f represents a delta-neutral porfolio, then**
+If we know any three of $\Delta$ , $\gamma$ , $\theta$ and the value of f, we can easily get the unknown one.Moreover, if f represents a delta-neutral porfolio, then
 
 $$\theta + \frac{1}{2}\sigma^2S^2 \gamma = rf $$
 
