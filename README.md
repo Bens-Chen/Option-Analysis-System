@@ -214,13 +214,11 @@ Based on first order Taylor-Series
 
 $\Delta = \frac{\partial c}{\partial S_0}$
 
-notes: the derivations won' be presented here , it can easily gets by deriving $\frac{\partial d_1}{\partial S_0} = \frac{\partial d_2}{\partial S_0} = \frac{1}{S_0 \sigma \sqrt{T}}$ in first step .....
+notes: the derivations won't be presented here , it can easily gets by deriving $\frac{\partial d_1}{\partial S_0} = \frac{\partial d_2}{\partial S_0} = \frac{1}{S_0 \sigma \sqrt{T}}$ in first step .....
 
-- Calls: $\Delta = \exp(-qT) N(d_1)$ 
-$\Delta$ is 1 when ITM and 0 when OTM
+- Calls: $\Delta = \exp(-qT) N(d_1)$, $\Delta$ is 1 when ITM and 0 when OTM
 
-- Puts : $\Delta = \exp(-qT)[N(d_1)-1]$ and will always in -1 - 0
-$\Delta$ is -1 when ITM and 0 when OTM
+- Puts : $\Delta = \exp(-qT)[N(d_1)-1]$ and will always in -1 - 0, $\Delta$ is -1 when ITM and 0 when OTM
 
 Because $\Delta$ jumps almost between two values, it varies dicountinuosly when near  ATM
 
@@ -231,7 +229,7 @@ $\gamma  = \frac{\partial^2 c}{\partial S_0^2}$
 
 - Be same and always positive for both calls and puts.
 - The value of $\gamma$ attains highest when ATM because $\Delta$  varies the most when near ATM.
-- The kurtosis is because higher for short T.The reason is due to the extreme variation (discountinuos change)of $delta$ near maturity.
+- The kurtosis is because higher for short T.The reason is due to the extreme variation (discountinuos change)of $\delta$ near maturity.
 
 
 ### vega
@@ -245,4 +243,4 @@ $\rho  = \frac{\partial c}{\partial r}$
 
 $\theta  = \frac{\partial c}{\partial T}$
 
-## Trading STrategies
+## Trading Strategies
