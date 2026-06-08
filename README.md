@@ -114,15 +114,15 @@ Get mean equals to 0, the logic is to sample first half, then latter half will b
 
 #### Control Variates[Kemna and Vorst(1990)]:
 
- A more complicated method. It requires u to get a similar, relevent underlying asset or derivative.Over all, u need to asumme $W = X + B(Y - \mu)$, and find $Y$ which has mean equals to $\mu$, and
+ A more complicated method. It requires u to get a similar, relevent underlying asset or derivative.Over all, u need to asumme $W = X + Beta(Y - \mu)$, and find $Y$ which has mean equals to $\mu$, and
 
 $$
-\mathrm{Var}(W) = \mathrm{Var}(X) + 2B\mathrm{Cov}(X,Y) + B^{2}\mathrm{Var}(Y)
+\mathrm{Var}(W) = \mathrm{Var}(X) + 2B\mathrm{Cov}(X,Y) + Beta^{2}\mathrm{Var}(Y)
 $$
 
-where $2B\mathrm{Cov}(X,Y) + B^{2}\mathrm{Var}(Y) < 0$.
+where $2Beta\mathrm{Cov}(X,Y) + Beta^{2}\mathrm{Var}(Y) < 0$.
  
- The first difficulty is  find the true mean of $Y$ (not sample mean) and the second is decide $B$ because $B = \mathrm{Cov}(X,Y)/\mathrm{Var}(Y)$, but due to $X$ and $Y$ are both dependent on drawn samples, the estimators might be affected.
+ The first difficulty is  find the true mean of $Y$ (not sample mean) and the second is decide $B$ because $Beta = \mathrm{Cov}(X,Y)/\mathrm{Var}(Y)$, but due to $X$ and $Y$ are both dependent on drawn samples, the estimators might be affected.
 
 ####  EMS[Duan and Siminato(1998)]: 
 
@@ -133,7 +133,7 @@ A method performs better than others when pricing path dependent options.The log
 
 This method is proposed to solve PDE.It has two way ,one is Implicit, the other is Explicit
 
-Similar to CRR, we divide discretize time but also Stock price,$F_{i,j}$ means option price when time $i$ and stock price $j$, and if the grid is small enough, it is equivalent to derive closed form.
+Similar to CRR, we divide discretize time but also Stock price, $F_{i,j}$ means option price when time $i$ and stock price $j$, and if the grid is small enough, it is equivalent to derive closed form.
 
 - Implicit: node $F_{i+1,j}$ derived from $F_{i,j+1}$, $F_{i,j}$, $F_{i,j-1}$ three nodes. 
 - Explicit: node $F_{i,j}$ derived from $F_{i+1,j+1}$, $F_{i+1,j}$, $F_{i+1,j-1}$ three nodes.
@@ -194,7 +194,7 @@ Here two ways to solve.
 
 #### Bisection Method:
 
-First find $[a_n,b_n]$ such that $f(a_n)f(b_n)<0$. The steps to find $[a_{n+1},b_{n+1}]$ are :
+First find $[a_n,b_n]$ such that $f(a_n)f(b_n)<0$. The iterative steps to find $[a_{n+1},b_{n+1}]$ are :
 - (1)Calculate $x_n = a_n +(b_n - a_n)/2$
 - (2)If $f(a_n)f(x_n) < 0$ => $a_{n+1} = a_n$, $b_{n+1} = x_n$, else $a_{n+1} = x_n$, $b_{n+1} = b_n$
 
