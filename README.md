@@ -83,6 +83,15 @@ This project is for educational purposes only and should not be used as financia
 ## Methods
 ### Black-Scholes
 
+$$C &= S \Phi(d_1) - K e^{-r(T-t)} \Phi(d_2) \\
+P &= K e^{-r(T-t)} \Phi(-d_2) - S \Phi(-d_1)
+
+Where the auxiliary variables are:
+\begin{align*}
+d_1 &= \frac{\ln\left(\frac{S}{K}\right) + \left(r + \frac{\sigma^2}{2}\right)(T-t)}{\sigma \sqrt{T-t}} \\
+d_2 &= d_1 - \sigma \sqrt{T-t}
+\end{align*}$$
+
 The most tyipical one with closed form. If options' payoff aren't the same as vanilla call or put, we can still use a simple way (compared to derive from PDE)Martingale Pricing Method to get it's closed form.
 
 Martingale Pricing Method is an alternative method to derive Black-Scholes like formulas.The most difficult part is how to change P measure to Q measure, however, due to RNVR, we know that P measure is equivalent to Q measure when pricing.Then by applying Girsanov Theorem and some calculations we can easily get the closed form of any European options.
