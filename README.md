@@ -214,7 +214,7 @@ Based on first order Taylor-Series
 
 $\Delta = \frac{\partial c}{\partial S_0}$
 
-notes: the derivations won' be presented here , it can easily gets by deriving $\frac{\partial d_1}{\partial S_0} = \frac{\partial d_2}{\partial S_0} = \frac{1}{S_0 \sigma sqrt{T}}$ in first step .....
+notes: the derivations won' be presented here , it can easily gets by deriving $\frac{\partial d_1}{\partial S_0} = \frac{\partial d_2}{\partial S_0} = \frac{1}{S_0 \sigma \sqrt{T}}$ in first step .....
 
 - Calls: $\Delta = \exp(-qT) N(d_1)$ 
 $\Delta$ is 1 when ITM and 0 when OTM
