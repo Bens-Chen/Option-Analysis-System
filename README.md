@@ -114,15 +114,15 @@ Get mean equals to 0, the logic is to sample first half, then latter half will b
 
 #### Control Variates[Kemna and Vorst(1990)]:
 
- A more complicated method. It requires u to get a similar, relevent underlying asset or derivative.Over all, u need to asumme $W = X + Beta(Y - \mu)$, and find $Y$ which has mean equals to $\mu$, and
+ A more complicated method. It requires u to get a similar, relevent underlying asset or derivative.Over all, u need to asumme $W = X + B(Y - \mu)$, and find $Y$ which has mean equals to $\mu$, and
 
 $$
-\mathrm{Var}(W) = \mathrm{Var}(X) + 2B\mathrm{Cov}(X,Y) + Beta^{2}\mathrm{Var}(Y)
+\mathrm{Var}(W) = \mathrm{Var}(X) + 2B\mathrm{Cov}(X,Y) + B^{2}\mathrm{Var}(Y)
 $$
 
-where $2Beta\mathrm{Cov}(X,Y) + Beta^{2}\mathrm{Var}(Y) < 0$.
+where $2B\mathrm{Cov}(X,Y) + B^{2}\mathrm{Var}(Y) < 0$.
  
- The first difficulty is  find the true mean of $Y$ (not sample mean) and the second is decide $B$ because $Beta = \mathrm{Cov}(X,Y)/\mathrm{Var}(Y)$, but due to $X$ and $Y$ are both dependent on drawn samples, the estimators might be affected.
+ The first difficulty is  find the true mean of $Y$ (not sample mean) and the second is decide $B$ because $B = \mathrm{Cov}(X,Y)/\mathrm{Var}(Y)$, but due to $X$ and $Y$ are both dependent on drawn samples, the estimators might be affected.
 
 ####  EMS[Duan and Siminato(1998)]: 
 
