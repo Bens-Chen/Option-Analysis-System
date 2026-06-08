@@ -1,6 +1,82 @@
 # Option Pricing
 
-This repository is some introductions and codes of different methods and some techniques to price options.
+This repository contains introductions and Python implementations of option pricing methods, including Black-Scholes, CRR binomial trees, Monte Carlo simulation, finite difference methods, exotic options, and implied volatility calibration.
+
+## Features
+
+- Closed-form Black-Scholes pricing for European call and put options
+- CRR binomial tree pricing for European and American options
+- Monte Carlo pricing with confidence interval components
+- Finite difference methods for option pricing PDEs
+- Exotic option examples: Asian, Lookback, and Rainbow options
+- Implied volatility calibration notes and code
+
+## Installation
+
+Clone the repository and install the dependencies:
+
+```bash
+git clone https://github.com/Bens-Chen/Option-Pricing-.git
+cd Option-Pricing-
+pip install -r requirements.txt
+```
+
+## Quick Start
+
+Run the Black-Scholes example:
+
+```bash
+python examples/black_scholes_example.py
+```
+
+Expected output:
+
+```text
+Call price: 10.4506
+Put price: 5.5735
+```
+
+You can also run:
+
+```bash
+python examples/crr_example.py
+python examples/monte_carlo_example.py
+```
+
+## Project Structure
+
+```text
+Calibration/
+  implied_volatility.py
+Exotic_Options/
+  asian_option.py
+  lookback_option.py
+  rainbow_option.py
+Methods/
+  black_scholes.py
+  crr.py
+  finite_difference.py
+  monte_carlo.py
+examples/
+  black_scholes_example.py
+  crr_example.py
+  monte_carlo_example.py
+tests/
+  test_black_scholes.py
+  test_crr.py
+```
+
+## Tests
+
+Run the test suite with:
+
+```bash
+pytest
+```
+
+## Disclaimer
+
+This project is for educational purposes only and should not be used as financial advice or as a production trading system.
 
 ## Methods
 ### Black-Scholes
