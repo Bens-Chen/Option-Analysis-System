@@ -212,14 +212,14 @@ Based on first order Taylor-Series
 ## Greak Letters
 ### delta
 
-$ \Delta = \frac{\partial c}{\partial S0}$
+$\Delta = \frac{\partial c}{\partial S_0}$
 
-notes: the derivations won' be presented here , it can easily gets by deriving $\frac{\partial d_1}{\partial S0} = \frac{\partial d_2}{\partial S0} = \frac{1}{S0*\sigmasqrt(T)}$ in first step .....
+notes: the derivations won' be presented here , it can easily gets by deriving $\frac{\partial d_1}{\partial S_0} = \frac{\partial d_2}{\partial S_0} = \frac{1}{S_0 \sigma sqrt{T}}$ in first step .....
 
-- Calls: $ \Delta = \exp(-qT) N(d_1)$ 
+- Calls: $\Delta = \exp(-qT) N(d_1)$ 
 $\Delta$ is 1 when ITM and 0 when OTM
 
-- Puts : $\Delta = \exp(-qT) [N(d_1)-1]$ and will always in -1 - 0
+- Puts : $\Delta = \exp(-qT)[N(d_1)-1]$ and will always in -1 - 0
 $\Delta$ is -1 when ITM and 0 when OTM
 
 Because $\Delta$ jumps almost between two values, it varies dicountinuosly when near  ATM
@@ -227,7 +227,7 @@ Because $\Delta$ jumps almost between two values, it varies dicountinuosly when 
 
 ### gamma
 
-$\gamma  = \frac{\partial^2 c}{\partial S0^2}$
+$\gamma  = \frac{\partial^2 c}{\partial S_0^2}$
 
 - Be same and always positive for both calls and puts.
 - The value of $\gamma$ attains highest when ATM because $\Delta$  varies the most when near ATM.
@@ -236,10 +236,10 @@ $\gamma  = \frac{\partial^2 c}{\partial S0^2}$
 
 ### vega
 
-$\vega  = \frac{\partial c}{\partial \sigma}$
+$\nu  = \frac{\partial c}{\partial \sigma}$
 
-### pho
-$\pho  = \frac{\partial c}{\partial r}$
+### rho
+$\rho  = \frac{\partial c}{\partial r}$
 
 ### theta
 
