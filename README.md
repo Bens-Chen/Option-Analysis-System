@@ -119,7 +119,7 @@ Get mean equals to 0, the logic is to sample first half, then latter half will b
  A more complicated method. It requires u to get a similar, relevent underlying asset or derivative.Over all, u need to asumme $W = X + \beta(Y - \mu)$, and find $Y$ which has mean equals to $\mu$, and
 
 $$
-\mathrm{Var}(W) = \mathrm{Var}(X) + 2\beta\mathrm{Cov}(X,Y) + B^{2}\mathrm{Var}(Y)
+\mathrm{Var}(W) = \mathrm{Var}(X) + 2\beta\mathrm{Cov}(X,Y) + \beta^{2}\mathrm{Var}(Y)
 $$
 
 where $2\beta\mathrm{Cov}(X,Y) + \beta^{2}\mathrm{Var}(Y) < 0$.
@@ -214,15 +214,15 @@ Based on first order Taylor-Series
 
 $ \Delta = \frac{\partial c}{\partial S0}$
 
-notes: the derivations won' be presented here , it can easily gets by deriving $\frac{\partial d_1}{\partial S0} = \frac{\partial d_2}{\partial S0} = \frac{1}{S0*\sigma*sqrt(T)}$ in first step .....
+notes: the derivations won' be presented here , it can easily gets by deriving $\frac{\partial d_1}{\partial S0} = \frac{\partial d_2}{\partial S0} = \frac{1}{S0*\sigmasqrt(T)}$ in first step .....
 
 - Calls: $ \Delta = \exp(-qT) N(d_1)$ 
-$ \Delta $ is 1 when ITM and 0 when OTM
+$\Delta$ is 1 when ITM and 0 when OTM
 
-- Puts : $ \Delta = \exp(-qT) [N(d_1)-1]$ and will always in -1 - 0
-$ \Delta $ is -1 when ITM and 0 when OTM
+- Puts : $\Delta = \exp(-qT) [N(d_1)-1]$ and will always in -1 - 0
+$\Delta$ is -1 when ITM and 0 when OTM
 
-Because $ \Delta $ jumps almost between two values, it varies dicountinuosly when near  ATM
+Because $\Delta$ jumps almost between two values, it varies dicountinuosly when near  ATM
 
 
 ### gamma
