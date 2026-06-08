@@ -210,6 +210,7 @@ $$
 Based on first order Taylor-Series
 
 ## Greak Letters
+ 
 ### delta
 
 $\Delta = \frac{\partial c}{\partial S_0}$
@@ -236,11 +237,36 @@ $\gamma  = \frac{\partial^2 c}{\partial S_0^2}$
 
 $\nu  = \frac{\partial c}{\partial \sigma}$
 
+- Be same and always positive for both calls and puts.It implies that higher volatility increase options' price
+- When time close to maturity, $\nu$ become smaller. Because there is lesser time for volatility to affect option price
+- Similar to $\gamma$ ,both are alike density function.
+
 ### rho
+
 $\rho  = \frac{\partial c}{\partial r}$
+
+- Similar to $\Delta$, but not be restricted to 0 - 1 or -1 -0
 
 ### theta
 
 $\theta  = \frac{\partial c}{\partial T}$
 
+- Meaure the speed of the option value decay with the passage of time.
+- Be always negative for American and European calls, but not for European puts.
+- When ATM $\theta$ is most negative, due to fatest time decay .
+
+
+### The relationship among $\Delta$ , $\gamma$ , $\theta$
+
+**By PDE:**
+  $$\frac{\partial f}{\partial t} + (r-q)S\frac{\partial f}{\partial S} + \frac{1}{2}\sigma^2S^2 \frac{\partial^2 f}{\partial S^2} = rf $$
+
+**and the definitions of $\Delta$ , $\gamma$ and $\theta$ ,we can derie**
+  $$\theta + (r-q)S\Delta + \frac{1}{2}\sigma^2S^2 \gamma = rf $$
+
+**If we know any three of $\Delta$ , $\gamma$ , $\theta$ and the value of f, we can easily get the unknown one.Moreover, if f represents a delta-neutral porfolio, then**
+
+$$\theta + \frac{1}{2}\sigma^2S^2 \gamma = rf $$
+
+which implies that for delta-neutral porfolio, higher $\gamma$ and $\theta$ are good feature for option holders.
 ## Trading Strategies
