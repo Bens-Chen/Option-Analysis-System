@@ -1,6 +1,6 @@
 # Option Pricing
 
-This repository contains introductions and Python implementations of option pricing methods, including Black-Scholes, CRR binomial trees, Monte Carlo simulation, finite difference methods, exotic options, and implied volatility calibration.
+This repository contains introductions and Python implementations of option pricing methods.
 
 ## Features
 
@@ -10,6 +10,8 @@ This repository contains introductions and Python implementations of option pric
 - Finite difference methods for option pricing PDEs
 - Exotic option examples: Asian, Lookback, and Rainbow options
 - Implied volatility calibration notes and code
+- Greak letters introduction and caluculation
+- Option trading strategies
 
 ## Installation
 
@@ -114,15 +116,15 @@ Get mean equals to 0, the logic is to sample first half, then latter half will b
 
 #### Control Variates[Kemna and Vorst(1990)]:
 
- A more complicated method. It requires u to get a similar, relevent underlying asset or derivative.Over all, u need to asumme $W = X + B(Y - \mu)$, and find $Y$ which has mean equals to $\mu$, and
+ A more complicated method. It requires u to get a similar, relevent underlying asset or derivative.Over all, u need to asumme $W = X + \beta(Y - \mu)$, and find $Y$ which has mean equals to $\mu$, and
 
 $$
-\mathrm{Var}(W) = \mathrm{Var}(X) + 2B\mathrm{Cov}(X,Y) + B^{2}\mathrm{Var}(Y)
+\mathrm{Var}(W) = \mathrm{Var}(X) + 2\beta\mathrm{Cov}(X,Y) + B^{2}\mathrm{Var}(Y)
 $$
 
-where $2B\mathrm{Cov}(X,Y) + B^{2}\mathrm{Var}(Y) < 0$.
+where $2\beta\mathrm{Cov}(X,Y) + \beta^{2}\mathrm{Var}(Y) < 0$.
  
- The first difficulty is  find the true mean of $Y$ (not sample mean) and the second is decide $B$ because $B = \mathrm{Cov}(X,Y)/\mathrm{Var}(Y)$, but due to $X$ and $Y$ are both dependent on drawn samples, the estimators might be affected.
+ The first difficulty is  find the true mean of $Y$ (not sample mean) and the second is decide $\beta$ because $\beta = \mathrm{Cov}(X,Y)/\mathrm{Var}(Y)$, but due to $X$ and $Y$ are both dependent on drawn samples, the estimators might be affected.
 
 ####  EMS[Duan and Siminato(1998)]: 
 
@@ -206,3 +208,41 @@ x_{n+1} = x_n - \frac{f(x_n)}{f'(x_n)}
 $$
 
 Based on first order Taylor-Series
+
+## Greak Letters
+### delta
+
+$ \Delta = \frac{\partial c}{\partial S0}$
+
+notes: the derivations won' be presented here , it can easily gets by deriving $\frac{\partial d_1}{\partial S0} = \frac{\partial d_2}{\partial S0} = \frac{1}{S0*\sigma*sqrt(T)}$ in first step .....
+
+- Calls: $ \Delta = \exp(-qT) N(d_1)$ 
+$ \Delta $ is 1 when ITM and 0 when OTM
+
+- Puts : $ \Delta = \exp(-qT) [N(d_1)-1]$ and will always in -1 - 0
+$ \Delta $ is -1 when ITM and 0 when OTM
+
+Because $ \Delta $ jumps almost between two values, it varies dicountinuosly when near  ATM
+
+
+### gamma
+
+$\gamma  = \frac{\partial^2 c}{\partial S0^2}$
+
+- Be same and always positive for both calls and puts.
+- The value of $\gamma$ attains highest when ATM because $\Delta$  varies the most when near ATM.
+- The kurtosis is because higher for short T.The reason is due to the extreme variation (discountinuos change)of $delta$ near maturity.
+
+
+### vega
+
+$\vega  = \frac{\partial c}{\partial \sigma}$
+
+### pho
+$\pho  = \frac{\partial c}{\partial r}$
+
+### theta
+
+$\theta  = \frac{\partial c}{\partial T}$
+
+## Trading STrategies
