@@ -299,4 +299,12 @@ $$
 $$
 
 which implies that for delta-neutral porfolio, higher $\gamma$ and $\theta$ are good feature for option holders.
+
+### Calculations
+For European , due to Black-Scholes, we can easily get greek letters.However,what about other types of option. Here are two methods to derive greek letters and how to dynamic delta hedge.
+#### CRR
+#### Monte-Carlo
+
+#### Dynamic Delta Hedge
+
 ## Trading Strategies
