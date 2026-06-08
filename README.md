@@ -83,14 +83,27 @@ This project is for educational purposes only and should not be used as financia
 ## Methods
 ### Black-Scholes
 
-$$C &= S \Phi(d_1) - K e^{-r(T-t)} \Phi(d_2) \\
-P &= K e^{-r(T-t)} \Phi(-d_2) - S \Phi(-d_1)
+The Black-Scholes prices for a European call and put with dividend yield are:
 
-Where the auxiliary variables are:
-\begin{align*}
-d_1 &= \frac{\ln\left(\frac{S}{K}\right) + \left(r + \frac{\sigma^2}{2}\right)(T-t)}{\sigma \sqrt{T-t}} \\
-d_2 &= d_1 - \sigma \sqrt{T-t}
-\end{align*}$$
+$$
+C = S e^{-qT} N(d_1) - K e^{-rT} N(d_2)
+$$
+
+$$
+P = K e^{-rT} N(-d_2) - S e^{-qT} N(-d_1)
+$$
+
+where:
+
+$$
+d_1 = \frac{\ln(S/K) + (r - q + 0.5\sigma^{2})T}{\sigma\sqrt{T}}
+$$
+
+$$
+d_2 = d_1 - \sigma\sqrt{T}
+$$
+
+$N(x)$ is the cumulative distribution function of the standard normal distribution.
 
 The most tyipical one with closed form. If options' payoff aren't the same as vanilla call or put, we can still use a simple way (compared to derive from PDE)Martingale Pricing Method to get it's closed form.
 
@@ -235,7 +248,7 @@ Because $\Delta$ jumps almost between two values, it varies dicountinuosly when 
 
 ### gamma
 
-$\gamma  = \frac{\partial^2 c}{\partial S_0^2}$
+$\gamma  = \frac{\partial^{2} c}{\partial S_0^{2}}$
 
 - Be same and always positive for both calls and puts.
 - The value of $\gamma$ attains highest when ATM because $\Delta$  varies the most when near ATM.
@@ -269,15 +282,21 @@ $\theta  = \frac{\partial c}{\partial T}$
 
 By PDE:
 
-  $$\frac{\partial f}{\partial t} + (r-q)S\frac{\partial f}{\partial S} + \frac{1}{2}\sigma^2S^2 \frac{\partial^2 f}{\partial S^2} = rf $$
+$$
+\frac{\partial f}{\partial t} + (r-q)S\frac{\partial f}{\partial S} + \frac{1}{2}\sigma^{2}S^{2} \frac{\partial^{2} f}{\partial S^{2}} = rf
+$$
 
 and the definitions of $\Delta$ , $\gamma$ and $\theta$ ,we can derie
 
-  $$\theta + (r-q)S\Delta + \frac{1}{2}\sigma^2S^2 \gamma = rf $$
+$$
+\theta + (r-q)S\Delta + \frac{1}{2}\sigma^{2}S^{2} \gamma = rf
+$$
 
 If we know any three of $\Delta$ , $\gamma$ , $\theta$ and the value of f, we can easily get the unknown one.Moreover, if f represents a delta-neutral porfolio, then
 
-$$\theta + \frac{1}{2}\sigma^2S^2 \gamma = rf $$
+$$
+\theta + \frac{1}{2}\sigma^{2}S^{2} \gamma = rf
+$$
 
 which implies that for delta-neutral porfolio, higher $\gamma$ and $\theta$ are good feature for option holders.
 ## Trading Strategies
