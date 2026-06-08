@@ -1,4 +1,4 @@
-# Entry Q quant
+# Option Pricing
 
 This repository is some introductions and codes of different methods and some techniques to price options.
 
