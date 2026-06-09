@@ -8,7 +8,7 @@ Run it with:
 streamlit run Option_System/app.py
 ```
 
-## What the App Does
+## What the System Does
 
 1. Search a ticker through `yfinance`.
 2. Load available expiration dates and option chains.
