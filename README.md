@@ -1,19 +1,16 @@
-# Option Pricing
+# Option Pricing 
 
-This repository is an option-pricing project. It introduces core pricing methods, calibration tools, exotic option examples, Greek-letter estimation, hedging ideas, and selected trading strategies with Python implementations.
+This repository is an option-pricing project. It introduces classic pricing methods, calibration tools, exotic option examples, Greek-letter estimation, hedging ideas, and selected trading strategies with Python implementations(including backtest).
 
 ## Features
 
-- Closed-form Black-Scholes pricing for European vanilla options
-- CRR binomial tree pricing for European and American options
-- Monte Carlo pricing and simulation-based Greek estimation
-- Finite difference methods for option-pricing PDEs
-- Exotic option examples: Asian, Lookback, and Rainbow options
-- Implied volatility calibration notes and code
-- Greek letters, CRR Greeks, Monte Carlo Greeks, and dynamic delta hedging
-- Selected option trading strategy notes in a dedicated folder
-- yfinance market-data connection for price history, option chains, IV, and contract search
-- Interactive option analysis system with European BS Greeks, American CRR Greeks, charts, strategies, and scenario backtests
+- Methods: Black-Scholes,CRR, Monte Carlo and Finite Difference
+- Greek Letters estimation
+- Implied Volatility calibration
+- Exotic option : Asian, Lookback, and Rainbow options
+- Option Trading Strateies 
+- Market Data: yfinance connection for price history, option chains, IV, and contract search
+- Interactive Option System 
 
 ## Installation
 
