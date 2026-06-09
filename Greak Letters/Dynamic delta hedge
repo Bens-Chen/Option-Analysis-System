@@ -1,0 +1,9 @@
+Dynamic delta hedging replicates an option by adjusting the stock position as delta changes.
+
+For a call option issuer:
+
+- If delta rises, buy more shares.
+- If delta falls, sell shares.
+- More frequent rebalancing makes the hedge closer to the Black-Scholes theoretical value.
+
+In practice, hedging is imperfect because rebalancing is discrete, volatility changes, and transaction costs exist.

@@ -1,0 +1,102 @@
+import math
+import numpy as np
+
+from Methods.crr import CRR_O_n as CRR
+
+
+def _gamma_from_three_nodes(value_up, value_mid, value_down, stock_up, stock_mid, stock_down):
+    delta_up = (value_up - value_mid) / (stock_up - stock_mid)
+    delta_down = (value_mid - value_down) / (stock_mid - stock_down)
+    return (delta_up - delta_down) / ((stock_up - stock_down) / 2)
+
+
+def _crr_trees(S, K, r, q, sigma, T, n, option_type):
+    dt = T / n
+    u = math.exp(sigma * math.sqrt(dt))
+    d = 1 / u
+    p = (math.exp((r - q) * dt) - d) / (u - d)
+    discount = math.exp(-r * dt)
+
+    stock = np.zeros((n + 1, n + 1))
+    call = np.zeros((n + 1, n + 1))
+    put = np.zeros((n + 1, n + 1))
+
+    for i in range(n + 1):
+        for j in range(i + 1):
+            stock[i][j] = S * u ** (i - j) * d**j
+
+    for j in range(n + 1):
+        call[n][j] = max(stock[n][j] - K, 0)
+        put[n][j] = max(K - stock[n][j], 0)
+
+    for i in range(n - 1, -1, -1):
+        for j in range(i + 1):
+            call_hold = discount * (p * call[i + 1][j] + (1 - p) * call[i + 1][j + 1])
+            put_hold = discount * (p * put[i + 1][j] + (1 - p) * put[i + 1][j + 1])
+
+            if option_type == "American":
+                call_exercise = max(stock[i][j] - K, 0)
+                put_exercise = max(K - stock[i][j], 0)
+                call[i][j] = max(call_hold, call_exercise)
+                put[i][j] = max(put_hold, put_exercise)
+            else:
+                call[i][j] = call_hold
+                put[i][j] = put_hold
+
+    return stock, call, put
+
+
+# CRR Greek letters from nearby tree levels.
+def CRR_greek_one(S, K, r, q, sigma, T, n, option_type="European"):
+    dt = T / n
+    stock, call, put = _crr_trees(S, K, r, q, sigma, T, n, option_type)
+
+    c_delta = (call[1][0] - call[1][1]) / (stock[1][0] - stock[1][1])
+    c_gamma = _gamma_from_three_nodes(
+        call[2][0], call[2][1], call[2][2],
+        stock[2][0], stock[2][1], stock[2][2],
+    )
+    c_theta = (call[2][1] - call[0][0]) / (2 * dt)
+
+    p_delta = (put[1][0] - put[1][1]) / (stock[1][0] - stock[1][1])
+    p_gamma = _gamma_from_three_nodes(
+        put[2][0], put[2][1], put[2][2],
+        stock[2][0], stock[2][1], stock[2][2],
+    )
+    p_theta = (put[2][1] - put[0][0]) / (2 * dt)
+
+    return c_delta, c_gamma, c_theta, p_delta, p_gamma, p_theta
+
+
+# Extended tree model by Pelsser and Vorst(1994).
+def CRR_greek_extended(S, K, r, q, sigma, T, n, option_type="European"):
+    if n < 3:
+        raise ValueError("n must be at least 3 to estimate theta with the extended tree.")
+
+    dt = T / n
+    u = math.exp(sigma * math.sqrt(dt))
+    d = 1 / u
+
+    stock_up = S * u**2
+    stock_mid = S
+    stock_down = S * d**2
+
+    call_up, put_up = CRR(stock_up, K, r, q, sigma, T, n, option_type)
+    call_mid, put_mid = CRR(stock_mid, K, r, q, sigma, T, n, option_type)
+    call_down, put_down = CRR(stock_down, K, r, q, sigma, T, n, option_type)
+
+    c_delta = (call_up - call_down) / (stock_up - stock_down)
+    c_gamma = _gamma_from_three_nodes(
+        call_up, call_mid, call_down,
+        stock_up, stock_mid, stock_down,
+    )
+    c_theta = (CRR(S, K, r, q, sigma, T - 2 * dt, n - 2, option_type)[0] - call_mid) / (2 * dt)
+
+    p_delta = (put_up - put_down) / (stock_up - stock_down)
+    p_gamma = _gamma_from_three_nodes(
+        put_up, put_mid, put_down,
+        stock_up, stock_mid, stock_down,
+    )
+    p_theta = (CRR(S, K, r, q, sigma, T - 2 * dt, n - 2, option_type)[1] - put_mid) / (2 * dt)
+
+    return c_delta, c_gamma, c_theta, p_delta, p_gamma, p_theta
