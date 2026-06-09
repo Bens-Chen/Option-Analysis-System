@@ -2,6 +2,8 @@
 
 This repository contains introductions and Python implementations of option pricing methods.
 
+At the end , I will present a  system which can quickly give user the accurate price interval or spot ,greek letters and simple strategy recommendation(including backtest result).
+
 ## Features
 
 - Closed-form Black-Scholes pricing for European call and put options
@@ -12,6 +14,7 @@ This repository contains introductions and Python implementations of option pric
 - Implied volatility calibration notes and code
 - Greak letters introduction and caluculation
 - Option trading strategies
+- Option Trading System 
 
 ## Installation
 
@@ -301,8 +304,13 @@ $$
 which implies that for delta-neutral porfolio, higher $\gamma$ and $\theta$ are good feature for option holders.
 
 ### Calculations
-For European , due to Black-Scholes, we can easily get greek letters.However,what about other types of option. Here are two methods to derive greek letters and how to dynamic delta hedge.
+For European , due to Black-Scholes, we can easily get greek letters.However,what about other types of option. Here are three methods to derive greek letters and how to dynamic delta hedge.
+
+#### Numerical Differentiation
+
+
 #### CRR
+
 #### Monte-Carlo
 
 #### Dynamic Delta Hedge
