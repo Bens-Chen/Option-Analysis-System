@@ -217,7 +217,7 @@ $$
 f(\sigma_{imp}) = c(S_0,K,r,q,\sigma_{imp},T) - C_{market} = 0
 $$
 
-Here two ways to solve.
+Here two ways to solve.(Assume volatility is a constant)
 
 #### Bisection Method:
 
@@ -233,6 +233,10 @@ x_{n+1} = x_n - \frac{f(x_n)}{f'(x_n)}
 $$
 
 Based on first order Taylor-Series
+
+However, impled volatility isn't a constant as Black-Scholes' assumption.It has feature called volatility smile or smirk.Here we introduce Stocahstic Volatilit to lineate the curve of IV.
+
+** If we want to forecast IV,there are some models we can choose including: SV,SVJ,SVJJ,Garch,GJR-Garch,Garch-Midas,HAR-RV-CJ...**
 
 ## Greak Letters
  
@@ -304,15 +308,27 @@ $$
 which implies that for delta-neutral porfolio, higher $\gamma$ and $\theta$ are good feature for option holders.
 
 ### Calculations
+
 For European , due to Black-Scholes, we can easily get greek letters.However,what about other types of option. Here are three methods to derive greek letters and how to dynamic delta hedge.
 
-#### Numerical Differentiation
+#### CRR[Pelsser and Vorst(1994)]
 
-
-#### CRR
+Only applcable on $\Delta$ , $\gamma$ and $\theta$.
 
 #### Monte-Carlo
+
+Here are two ways :pathwise and likelihood.
+Take Eurpoean put as example.
+
+note: huge computation burden due to simulation needs to be performed twice
+
+##### Pathwise
+
+
+##### Likelihood
 
 #### Dynamic Delta Hedge
 
 ## Trading Strategies
+
+## Option Trading System
