@@ -114,7 +114,36 @@ def build_chain_strategy_legs(strategy_name, selected_row, calls, puts, other_st
             {"option_kind": "call", "side": side, "strike": float(call_row["strike"]), "premium": _market_premium(call_row), "quantity": 1},
         ]
 
+    if strategy_name in {"Long Call Butterfly", "Short Call Butterfly"}:
+        lower_target, upper_target = _butterfly_outer_targets(calls, strike, other_strike)
+        lower_call = _nearest_strike_row(calls, lower_target)
+        middle_call = _nearest_strike_row(calls, strike)
+        upper_call = _nearest_strike_row(calls, upper_target)
+        middle_side = "short" if strategy_name == "Long Call Butterfly" else "long"
+        wing_side = "long" if strategy_name == "Long Call Butterfly" else "short"
+        return [
+            {"option_kind": "call", "side": wing_side, "strike": float(lower_call["strike"]), "premium": _market_premium(lower_call), "quantity": 1},
+            {"option_kind": "call", "side": middle_side, "strike": float(middle_call["strike"]), "premium": _market_premium(middle_call), "quantity": 2},
+            {"option_kind": "call", "side": wing_side, "strike": float(upper_call["strike"]), "premium": _market_premium(upper_call), "quantity": 1},
+        ]
+
     raise ValueError(f"Unknown strategy: {strategy_name}")
+
+
+def _butterfly_outer_targets(calls, middle_strike, requested_width=None):
+    strikes = sorted(float(strike) for strike in calls["strike"].dropna().unique())
+    lower_strikes = [strike for strike in strikes if strike < middle_strike]
+    upper_strikes = [strike for strike in strikes if strike > middle_strike]
+    if not lower_strikes or not upper_strikes:
+        raise ValueError("Butterfly spread needs strikes below and above the selected middle strike.")
+
+    if requested_width is None:
+        return lower_strikes[-1], upper_strikes[0]
+
+    width = abs(float(requested_width))
+    if width == 0:
+        return lower_strikes[-1], upper_strikes[0]
+    return middle_strike - width, middle_strike + width
 
 
 def _nearest_strike_row(chain, strike):
@@ -142,11 +171,14 @@ def rank_strategy_candidates(spot, historical_volatility, selected_iv, trend_sig
     if np.isfinite(iv_ratio) and iv_ratio >= 1.2:
         add("Short Strangle", 75, "IV is high versus historical volatility, so premium-selling structures receive higher educational score.")
         add("Short Straddle", 65, "High IV helps option sellers, but risk is concentrated if price moves sharply.")
+        add("Short Call Butterfly", 52, "High IV can make the short middle calls expensive, but butterfly risk/reward depends strongly on strike spacing.")
     elif np.isfinite(iv_ratio) and iv_ratio <= 0.9:
         add("Long Straddle", 75, "IV is low versus historical volatility, so long-volatility structures receive higher educational score.")
         add("Long Strangle", 68, "Lower premium can help, but the underlying must move farther to break even.")
+        add("Long Call Butterfly", 55, "A butterfly can be reviewed when the expected terminal price is near the middle strike.")
     else:
         add("Single Option", 55, "IV is close to historical volatility, so the view depends more on direction and strike selection.")
+        add("Long Call Butterfly", 58, "A butterfly fits a range-bound view around the selected middle strike with limited risk.")
 
     if trend_signal == "bullish":
         add("Single Option", 62, "Underlying price is above its moving average, so bullish structures can be reviewed.")
@@ -183,6 +215,45 @@ def historical_scenario_backtest(price_history, spot, legs, holding_days=20):
         },
         index=returns.index,
     )
+
+
+def estimate_strategy_margin(legs, spot, width=0.8):
+    grid = payoff_grid(spot, legs, width=width, points=401)
+    worst_profit = float(grid["strategy_profit"].min())
+    net_debit = sum(
+        (1 if leg["side"] == "long" else -1)
+        * float(leg["premium"])
+        * int(leg.get("quantity", 1))
+        for leg in legs
+    )
+    debit_margin = max(net_debit, 0.0)
+    loss_margin = max(-worst_profit, 0.0)
+    return max(debit_margin, loss_margin)
+
+
+def backtest_metrics(backtest, margin):
+    profit = backtest["strategy_profit"].astype(float)
+    cumulative_profit = profit.cumsum()
+    running_peak = cumulative_profit.cummax()
+    drawdown = cumulative_profit - running_peak
+    max_drawdown = float(drawdown.min())
+
+    profit_std = float(profit.std(ddof=1))
+    sharpe_ratio = np.nan
+    if profit_std > 0:
+        sharpe_ratio = float(profit.mean() / profit_std)
+
+    return {
+        "avg_pnl": float(profit.mean()),
+        "total_pnl": float(profit.sum()),
+        "win_rate": float((profit > 0).mean()),
+        "sharpe_ratio": sharpe_ratio,
+        "mdd": max_drawdown,
+        "best_scenario": float(profit.max()),
+        "worst_scenario": float(profit.min()),
+        "margin_estimate": float(margin),
+        "return_on_margin": float(profit.mean() / margin) if margin > 0 else np.nan,
+    }
 
 
 def payoff_grid(spot, legs, width=0.35, points=101):

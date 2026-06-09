@@ -4,6 +4,7 @@ from scipy.optimize import brentq
 from scipy.stats import norm
 
 from Methods.black_scholes import BS
+from Methods.crr import CRR_O_n
 
 
 def black_scholes_greeks(S, K, r, q, sigma, T, option_kind):
@@ -58,6 +59,9 @@ def implied_volatility_from_price(
     q,
     T,
     option_kind,
+    pricing_model="BS",
+    option_style="European",
+    steps=200,
     lower=1e-4,
     upper=5.0,
 ):
@@ -65,9 +69,57 @@ def implied_volatility_from_price(
         raise ValueError("market_price must be positive.")
 
     def pricing_error(sigma):
-        return option_price_from_bs(S, K, r, q, sigma, T, option_kind) - market_price
+        if pricing_model == "CRR":
+            model_price = crr_option_price(S, K, r, q, sigma, T, option_kind, option_style, steps)
+        else:
+            model_price = option_price_from_bs(S, K, r, q, sigma, T, option_kind)
+        return model_price - market_price
 
     try:
         return brentq(pricing_error, lower, upper)
     except ValueError as exc:
         raise ValueError("Could not solve implied volatility for this contract.") from exc
+
+
+def crr_option_price(S, K, r, q, sigma, T, option_kind, option_style="American", steps=200):
+    call, put = CRR_O_n(S, K, r, q, sigma, T, steps, option_type=option_style)
+    return call if option_kind == "call" else put
+
+
+def crr_greeks_by_bump(
+    S,
+    K,
+    r,
+    q,
+    sigma,
+    T,
+    option_kind,
+    option_style="American",
+    steps=200,
+    spot_bump=0.01,
+    vol_bump=0.01,
+    rate_bump=0.0001,
+    time_bump_days=1,
+):
+    if sigma <= 0 or T <= 0:
+        raise ValueError("sigma and T must be positive.")
+
+    dS = max(S * spot_bump, 0.01)
+    dT = min(time_bump_days / 365, max(T / 2, 1e-6))
+
+    price = crr_option_price(S, K, r, q, sigma, T, option_kind, option_style, steps)
+    price_up = crr_option_price(S + dS, K, r, q, sigma, T, option_kind, option_style, steps)
+    price_down = crr_option_price(S - dS, K, r, q, sigma, T, option_kind, option_style, steps)
+    vol_up = crr_option_price(S, K, r, q, sigma + vol_bump, T, option_kind, option_style, steps)
+    rate_up = crr_option_price(S, K, r + rate_bump, q, sigma, T, option_kind, option_style, steps)
+    shorter_time = crr_option_price(S, K, r, q, sigma, T - dT, option_kind, option_style, steps)
+
+    return {
+        "model_price": price,
+        "delta": (price_up - price_down) / (2 * dS),
+        "gamma": (price_up - 2 * price + price_down) / (dS**2),
+        "theta_per_year": (shorter_time - price) / dT,
+        "theta_per_day": (shorter_time - price) / time_bump_days,
+        "vega": (vol_up - price) / (vol_bump * 100),
+        "rho": (rate_up - price) / (rate_bump * 10000),
+    }

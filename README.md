@@ -13,7 +13,7 @@ This repository is an option-pricing project. It introduces core pricing methods
 - Greek letters, CRR Greeks, Monte Carlo Greeks, and dynamic delta hedging
 - Selected option trading strategy notes in a dedicated folder
 - yfinance market-data connection for price history, option chains, IV, and contract search
-- Interactive option analysis system with Greeks, charts, strategies, and scenario backtests
+- Interactive option analysis system with European BS Greeks, American CRR Greeks, charts, strategies, and scenario backtests
 
 ## Installation
 
@@ -71,8 +71,8 @@ Market_Data/
 
 Option_System/
   README.md                  # interactive option search and strategy system
-  analytics.py               # IV and Greek calculations
-  strategy_engine.py         # strategy payoff, scoring, scenario backtest
+  analytics.py               # IV, BS Greeks, and American CRR Greek calculations
+  strategy_engine.py         # strategy payoff, butterfly spreads, scoring, scenario backtest
   app.py                     # Streamlit app
 
 Trading_Strategies/
