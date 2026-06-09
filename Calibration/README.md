@@ -1,6 +1,6 @@
-# Estimation and Calibration
+# Calibration
 
-This folder contains volatility estimation and implied volatility calibration notes.
+This folder contains  implied volatility calibration notes.
 
 ## Mean Estimation
 
