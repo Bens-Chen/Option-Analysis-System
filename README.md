@@ -1,8 +1,6 @@
 # Option Pricing
 
-This repository is an educational option-pricing project. It introduces core pricing methods, calibration tools, exotic option examples, Greek-letter estimation, hedging ideas, and selected trading strategies with Python implementations.
-
-The goal is to keep the root README as a map of the project. Detailed notes are placed inside the folder that owns the topic.
+This repository is an option-pricing project. It introduces core pricing methods, calibration tools, exotic option examples, Greek-letter estimation, hedging ideas, and selected trading strategies with Python implementations.
 
 ## Features
 
@@ -13,7 +11,7 @@ The goal is to keep the root README as a map of the project. Detailed notes are 
 - Exotic option examples: Asian, Lookback, and Rainbow options
 - Implied volatility calibration notes and code
 - Greek letters, CRR Greeks, Monte Carlo Greeks, and dynamic delta hedging
-- Selected option trading strategy notes
+- Selected option trading strategy notes in a dedicated folder
 
 ## Installation
 
@@ -53,10 +51,20 @@ Exotic_Options/
   rainbow_option.py
 
 Greak Letters/
-  README.md                  # Greeks, hedging, and strategy notes
+  README.md                  # Greeks and hedging notes
   CRR                        # CRR Greek calculations
   Monte-Carlo                # pathwise and likelihood Monte Carlo Greeks
   Dynamic delta hedge
+
+Trading_Strategies/
+  README.md                  # interval, butterfly, straddle, strangle, ADR arbitrage
+  adr_arbitrage.py
+  butterfly.py
+  interval_trading.py
+  payoffs.py
+  straddle.py
+  strangle.py
+
 
 Methods/
   README.md                  # core pricing method notes
@@ -80,8 +88,9 @@ tests/
 1. Start with `Methods/README.md` to understand the pricing engines.
 2. Read `Calibration/README.md` for implied volatility.
 3. Read `Exotic_Options/README.md` for path-dependent examples.
-4. Read `Greak Letters/README.md` for Greeks, hedging, and trading strategies.
-5. Check `examples/` and `tests/` to see how the code is used.
+4. Read `Greak Letters/README.md` for Greeks and hedging.
+5. Read `Trading_Strategies/README.md` for selected trading strategies.
+6. Check `examples/` and `tests/` to see how the code is used.
 
 ## Disclaimer
 

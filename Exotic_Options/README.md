@@ -14,6 +14,8 @@ $$
 
 Because multiple assets may be correlated, the implementation uses Cholesky decomposition to generate correlated simulations.
 
+Python provides Cholesky decomposition through `numpy.linalg.cholesky()`, but this project keeps the algorithmic idea visible because correlation handling is an important part of multi-asset option pricing.
+
 ## Lookback Option
 
 `lookback_option.py` studies path-dependent payoffs that depend on the maximum or minimum stock price during the option life.
@@ -21,10 +23,20 @@ Because multiple assets may be correlated, the implementation uses Cholesky deco
 For example, a lookback put payoff may be:
 
 $$
-\max(S_{\max,T} - S_T, 0)
+\max(S_{\max,\tau} - S_{\tau}, 0)
 $$
 
 The key idea is that the payoff depends on the path history, not only the final price.
+
+Here $S_{\max,\tau}$ is the maximum value of $S_u$ for:
+
+$$
+u = 0, \Delta t, 2\Delta t, \ldots
+$$
+
+Note that $S_{\max}$ is the maximum value of the stock path from 0 to the pricing date $t$. Since $t$ is the pricing date, the implementation still needs to evaluate the future maximum from $t$ to maturity $T$.
+
+This repo includes both CRR-style and Monte Carlo-style ideas for Lookback options.
 
 ## Asian Option
 
@@ -33,3 +45,21 @@ The key idea is that the payoff depends on the path history, not only the final 
 Asian or average-style options can be useful when the risk exposure is connected to an average price rather than one terminal price. Their volatility is usually lower than the underlying asset volatility, so they can be cheaper than comparable vanilla options.
 
 The main implementation challenge is tracking or approximating average-price states.
+
+Asian options are useful for investors or hedgers who are exposed to average price risk. They can also be useful in thinly traded markets because using an average price can reduce the effect of price manipulation near one specific terminal date.
+
+A related product is an Average option. For a call-style payoff:
+
+- Average option payoff:
+
+$$
+\max(S_{\mathrm{ave},T} - K, 0)
+$$
+
+- Asian-style payoff:
+
+$$
+\max(S_T - S_{\mathrm{ave},t}, 0)
+$$
+
+For simplicity, this project focuses on Average option logic. The difficult part is deriving or approximating each average-price node $A$. Since a previous average value may not appear exactly in the next tree layer, interpolation can be needed.
