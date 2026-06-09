@@ -23,11 +23,7 @@ Delta measures the option value change for a small change in the underlying pric
 The first step of the call delta derivation is:
 
 $$
-\frac{\partial d_1}{\partial S_0}
-=
-\frac{\partial d_2}{\partial S_0}
-=
-\frac{1}{S_0\sigma\sqrt{T}}
+\frac{\partial d_1}{\partial S_0}=\frac{\partial d_2}{\partial S_0}=\frac{1}{S_0\sigma\sqrt{T}}
 $$
 
 ## Gamma
