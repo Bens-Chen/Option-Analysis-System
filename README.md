@@ -233,10 +233,12 @@ x_{n+1} = x_n - \frac{f(x_n)}{f'(x_n)}
 $$
 
 Based on first order Taylor-Series
-
+----
 However, impled volatility isn't a constant as Black-Scholes' assumption.It has feature called volatility smile or smirk.Here we introduce Stocahstic Volatilit to lineate the curve of IV.
 
-** If we want to forecast IV,there are some models we can choose including: SV,SVJ,SVJJ,Garch,GJR-Garch,Garch-Midas,HAR-RV-CJ...**
+**If we want to forecast IV,there are some models we can choose including: SV,SVJ,SVJJ,Garch,GJR-Garch,Garch-Midas,HAR-RV-CJ...**
+
+### Stochastic Volatility
 
 ## Greak Letters
  
