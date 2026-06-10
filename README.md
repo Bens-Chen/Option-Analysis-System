@@ -4,7 +4,7 @@ This repository is an option-pricing project. It introduces classic pricing meth
 
 ## Features
 
-- Methods: Black-Scholes,CRR, Monte Carlo and Finite Difference
+- Methods: Black-Scholes, CRR, Monte Carlo and Finite Difference
 - Greek Letters estimation
 - Implied Volatility calibration
 - Exotic option : Asian, Lookback, and Rainbow options
@@ -81,7 +81,6 @@ Trading_Strategies/
   straddle.py
   strangle.py
 
-
 Methods/
   README.md                  # core pricing method notes
   black_scholes.py
@@ -104,7 +103,7 @@ tests/
 
 ## Reading Order
 
-1. Start with `Methods/README.md` to understand the pricing engines.
+1. Start with `Methods/README.md` to understand the pricing methods.
 2. Read `Market_Data/README.md` to see how real market data is pulled from yfinance.
 3. Read `Calibration/README.md` for implied volatility.
 4. Read `Greak Letters/README.md` for Greeks and hedging.
