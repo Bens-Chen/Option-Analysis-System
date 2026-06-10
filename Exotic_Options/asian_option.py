@@ -104,6 +104,6 @@ def monte_carlo_asian_call(St, K, r, q, sigma, t, T_minus_t, n, S_avet, num_simu
     discounted_payoff = np.exp(-r * T_minus_t) * payoff
     batch_prices = np.mean(discounted_payoff, axis=1)
     MC_price = np.mean(batch_prices)
-    MC_se = np.std(batch_prices, ddof=1) / math.sqrt(num_repetitions)
+    MC_se = np.std(batch_prices, ddof=1)
 
     return MC_price, MC_se
