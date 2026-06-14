@@ -93,6 +93,8 @@ $$
 
 High gamma is attractive, but it usually comes with faster time decay.
 
+
+
 ## CRR Greeks
 
 `CRR` estimates Delta, Gamma, and Theta from CRR tree nodes.
