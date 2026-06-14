@@ -1,6 +1,39 @@
 import math
 
 
+def estimate_forward_price_from_put_call_parity(r, T, K_list, call_price_list, put_price_list):
+    if T <= 0:
+        raise ValueError("T must be positive.")
+
+    option_data = sorted(zip(K_list, call_price_list, put_price_list))
+    valid_rows = []
+    for K, call_price, put_price in option_data:
+        K = float(K)
+        call_price = float(call_price)
+        put_price = float(put_price)
+        if K > 0 and call_price > 0 and put_price > 0:
+            valid_rows.append((K, call_price, put_price))
+
+    if not valid_rows:
+        raise ValueError("At least one valid matched call/put price is required to estimate F.")
+
+    reference_K, reference_call, reference_put = min(
+        valid_rows,
+        key=lambda row: (abs(row[1] - row[2]), row[0]),
+    )
+    F = reference_K + math.exp(r * T) * (reference_call - reference_put)
+    if not math.isfinite(F) or F <= 0:
+        raise ValueError("Estimated F must be positive. Check option prices.")
+
+    return {
+        "F": F,
+        "reference_strike": reference_K,
+        "call_price": reference_call,
+        "put_price": reference_put,
+        "call_put_diff": reference_call - reference_put,
+    }
+
+
 # VIX
 def VIX(r, T_minus_t, K_list, F, call_price_list, put_price_list):
     if T_minus_t <= 0:
@@ -102,13 +135,29 @@ def SVIX(St, r, T, K_list, F, call_price_list, put_price_list):
     }
 
 
-def VIX_SVIX(St, r, q, sigma, T, K_list, call_price_list, put_price_list, F=None):
+def VIX_SVIX(St, r, T, K_list, call_price_list, put_price_list, F=None):
     if F is None:
-        F = St * math.exp((r - q) * T)
+        forward = estimate_forward_price_from_put_call_parity(
+            r,
+            T,
+            K_list,
+            call_price_list,
+            put_price_list,
+        )
+        F = forward["F"]
+    else:
+        forward = {
+            "F": F,
+            "reference_strike": None,
+            "call_price": None,
+            "put_price": None,
+            "call_put_diff": None,
+        }
 
     return {
         "VIX": VIX(r, T, K_list, F, call_price_list, put_price_list),
         "SVIX": SVIX(St, r, T, K_list, F, call_price_list, put_price_list),
+        "forward": forward,
     }
 
 
@@ -120,8 +169,6 @@ if __name__ == "__main__":
     result = VIX_SVIX(
         St=100,
         r=0.04,
-        q=0.0,
-        sigma=0.2,
         T=30 / 365,
         K_list=K_list,
         call_price_list=call_price_list,

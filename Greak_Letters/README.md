@@ -1,6 +1,6 @@
 # Greek Letters and Hedging
 
-This folder contains notes and code for option Greeks and hedging.
+This folder contains notes and code for option Greeks (BS greek excluded) and hedging.
 
 ## Greek Letters
 

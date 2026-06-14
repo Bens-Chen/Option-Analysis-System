@@ -88,3 +88,21 @@ def test_build_chain_strategy_legs_adds_call_butterfly():
 
     assert [leg["quantity"] for leg in legs] == [1, 2, 1]
     assert [leg["side"] for leg in legs] == ["long", "short", "long"]
+
+
+def test_build_chain_strategy_legs_adds_put_butterfly():
+    calls = pd.DataFrame()
+    puts = pd.DataFrame(
+        [
+            {"strike": 95, "bid": 2.0, "ask": 2.4, "lastPrice": 2.2},
+            {"strike": 100, "bid": 4.0, "ask": 4.4, "lastPrice": 4.2},
+            {"strike": 105, "bid": 7.0, "ask": 7.4, "lastPrice": 7.2},
+        ]
+    )
+    selected = {"strike": 100, "option_kind": "put", "bid": 4.0, "ask": 4.4, "lastPrice": 4.2}
+
+    legs = build_chain_strategy_legs("Long Put Butterfly", selected, calls, puts, other_strike=5)
+
+    assert [leg["option_kind"] for leg in legs] == ["put", "put", "put"]
+    assert [leg["quantity"] for leg in legs] == [1, 2, 1]
+    assert [leg["side"] for leg in legs] == ["long", "short", "long"]

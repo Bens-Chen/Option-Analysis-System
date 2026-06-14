@@ -9,7 +9,7 @@ def _gamma_from_three_nodes(value_up, value_mid, value_down, stock_up, stock_mid
     delta_down = (value_mid - value_down) / (stock_mid - stock_down)
     return (delta_up - delta_down) / ((stock_up - stock_down) / 2)
 
-
+# get S, call, put for evey nodes first
 def _crr_trees(S, K, r, q, sigma, T, n, option_type):
     dt = T / n
     u = math.exp(sigma * math.sqrt(dt))

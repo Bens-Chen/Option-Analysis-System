@@ -1,6 +1,6 @@
 # Option Analysis System
 
-This folder contains the interactive system for searching option contracts, viewing IV and Greek letters, plotting strategy payoff, and running a simple historical scenario backtest.
+This folder contains the interactive system for searching option contracts, viewing IV and Greek letters, plotting strategy payoff, and running a simple historical backtest.
 
 Run it with:
 
@@ -16,9 +16,8 @@ streamlit run Option_System/app.py
 4. Show the contract IV and Black-Scholes Greek letters.
 5. Optionally show American-style CRR Greek estimates.
 6. Plot the selected strategy payoff.
-7. Rank common strategies with a simple educational score.
-8. Let the user enter custom option legs.
-9. Run a latest-5-year historical scenario backtest using past underlying returns.
+7. Let the user enter custom option legs.
+8. Run a latest-5-year historical scenario backtest using past underlying returns.
 
 ## Important Limitation
 
@@ -28,15 +27,6 @@ It uses historical stock returns and applies those moves to the current option s
 
 The displayed metrics include average PnL, total PnL, win rate, Sharpe ratio, MDD, estimated margin, return on margin, worst scenario, and best scenario. The margin estimate is based on the strategy payoff grid, so uncovered short-option risk is only approximated inside the plotted scenario range.
 
-## Strategy Scoring
-
-The strategy score is intentionally simple:
-
-- If current IV is much higher than historical volatility, short-premium strategies receive a higher educational score.
-- If current IV is much lower than historical volatility, long-volatility strategies receive a higher educational score.
-- If the stock is above or below moving averages, directional single-option ideas receive a small adjustment.
-
-This is not financial advice. It is a learning tool for comparing option structures.
 
 ## yfinance Coverage
 

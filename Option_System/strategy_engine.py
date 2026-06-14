@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 
-from Trading_Strategies.butterfly import call_butterfly_profit
 from Trading_Strategies.straddle import long_straddle_profit, short_straddle_profit
 from Trading_Strategies.strangle import long_strangle_profit, short_strangle_profit
 
@@ -125,6 +124,19 @@ def build_chain_strategy_legs(strategy_name, selected_row, calls, puts, other_st
             {"option_kind": "call", "side": wing_side, "strike": float(lower_call["strike"]), "premium": _market_premium(lower_call), "quantity": 1},
             {"option_kind": "call", "side": middle_side, "strike": float(middle_call["strike"]), "premium": _market_premium(middle_call), "quantity": 2},
             {"option_kind": "call", "side": wing_side, "strike": float(upper_call["strike"]), "premium": _market_premium(upper_call), "quantity": 1},
+        ]
+
+    if strategy_name in {"Long Put Butterfly", "Short Put Butterfly"}:
+        lower_target, upper_target = _butterfly_outer_targets(puts, strike, other_strike)
+        lower_put = _nearest_strike_row(puts, lower_target)
+        middle_put = _nearest_strike_row(puts, strike)
+        upper_put = _nearest_strike_row(puts, upper_target)
+        middle_side = "short" if strategy_name == "Long Put Butterfly" else "long"
+        wing_side = "long" if strategy_name == "Long Put Butterfly" else "short"
+        return [
+            {"option_kind": "put", "side": wing_side, "strike": float(lower_put["strike"]), "premium": _market_premium(lower_put), "quantity": 1},
+            {"option_kind": "put", "side": middle_side, "strike": float(middle_put["strike"]), "premium": _market_premium(middle_put), "quantity": 2},
+            {"option_kind": "put", "side": wing_side, "strike": float(upper_put["strike"]), "premium": _market_premium(upper_put), "quantity": 1},
         ]
 
     raise ValueError(f"Unknown strategy: {strategy_name}")

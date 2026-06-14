@@ -1,6 +1,5 @@
 from datetime import date
 import importlib.util
-import math
 from pathlib import Path
 import sys
 from importlib.machinery import SourceFileLoader
@@ -19,6 +18,7 @@ if str(IMPLIED_VOL_ROOT) not in sys.path:
 from Market_Data.yfinance_data import (
     add_mid_prices,
     download_price_history,
+    estimate_forward_price,
     estimate_annualized_volatility,
     fetch_option_chain,
     latest_close,
@@ -28,7 +28,6 @@ from Option_System.analytics import (
     black_scholes_greeks,
     crr_greeks_by_bump,
     crr_option_price,
-    fit_svi_smile,
     implied_volatility_from_price,
     option_price_from_bs,
 )
@@ -36,15 +35,12 @@ from Option_System.strategy_engine import (
     backtest_metrics,
     build_chain_strategy_legs,
     estimate_strategy_margin,
-    historical_scenario_backtest,
     moving_average_trend,
     payoff_grid,
-    rank_strategy_candidates,
     rank_strategies_by_backtest,
     rolling_strategy_backtest,
-    strategy_profit,
 )
-from iv_smile import IV_smile_arrays
+from iv_smile import IV_smile_arrays, fit_svi_smile
 
 
 def _load_vix_svix_module():
@@ -85,9 +81,9 @@ with st.sidebar:
     history_period = "5y"
     st.caption("Backtest period: latest 5 years")
     holding_days = st.number_input("Scenario holding days", value=20, min_value=1, max_value=252)
-    greek_model = st.selectbox("Greek model", ["Black-Scholes European", "CRR American"])
+    greek_model = st.selectbox("Greek model", ["European", "American"])
     st.caption(f"CRR steps fixed at n = {CRR_STEPS}")
-    load_data = st.button("Load Market Data", type="primary")
+    load_data = st.button("Load Data", type="primary")
 
 if not ticker:
     st.stop()
@@ -149,8 +145,8 @@ selected = chain_table.loc[chain_table["contractSymbol"] == selected_symbol].ilo
 T = _days_to_years(expiration)
 market_price = _mid_price(selected)
 yfinance_iv = float(selected.get("impliedVolatility", 0) or 0)
-pricing_model = "CRR" if greek_model == "CRR American" else "BS"
-option_style = "American" if greek_model == "CRR American" else "European"
+pricing_model = "CRR" if greek_model == "American" else "BS"
+option_style = "American" if greek_model == "American" else "European"
 
 try:
     model_iv = implied_volatility_from_price(
@@ -169,7 +165,7 @@ except ValueError as exc:
     st.warning(f"Could not solve model IV from market price. Historical volatility is used instead. Detail: {exc}")
     model_iv = historical_vol
 
-if greek_model == "CRR American":
+if greek_model == "American":
     model_price = crr_option_price(
         spot,
         float(selected["strike"]),
@@ -192,7 +188,7 @@ else:
         option_kind,
     )
 
-if greek_model == "CRR American":
+if greek_model == "American":
     greeks = crr_greeks_by_bump(
         spot,
         float(selected["strike"]),
@@ -219,25 +215,24 @@ st.subheader("Selected Contract Analytics")
 price_cols = st.columns(4)
 price_cols[0].metric("yfinance price", f"{market_price:.4f}")
 price_cols[1].metric("model price", f"{model_price:.4f}")
-price_cols[2].metric("model IV", f"{model_iv:.2%}")
-price_cols[3].metric("yfinance IV", f"{yfinance_iv:.2%}" if yfinance_iv > 0 else "N/A")
+price_cols[2].metric("yfinance IV", f"{yfinance_iv:.2%}" if yfinance_iv > 0 else "N/A")
+price_cols[3].metric("model IV", f"{model_iv:.2%}")
+
 
 metric_cols = st.columns(5)
 metric_cols[0].metric("Delta", f"{greeks['delta']:.4f}")
 metric_cols[1].metric("Gamma", f"{greeks['gamma']:.4f}")
-metric_cols[2].metric("Theta/day", f"{greeks['theta_per_day']:.4f}")
-metric_cols[3].metric("Vega/1%", f"{greeks['vega']:.4f}")
-metric_cols[4].metric("Rho/1%", f"{greeks['rho']:.4f}")
+metric_cols[2].metric("Theta", f"{greeks['theta_per_day']:.4f}")
+metric_cols[3].metric("Vega", f"{greeks['vega']:.4f}")
+metric_cols[4].metric("Rho", f"{greeks['rho']:.4f}")
 if "model_price" in greeks:
     st.caption(f"CRR American model price using model IV: {greeks['model_price']:.4f}")
 
-st.subheader("IV Smile, SVI Fit, and VIX-style Indicators")
+st.subheader("IV Smile, SVI Fit, and VIX,SVIX ")
 try:
     indicator_result = VIX_SVIX_MODULE.VIX_SVIX(
         St=spot,
         r=risk_free_rate,
-        q=dividend_yield,
-        sigma=historical_vol,
         T=T,
         K_list=matched_chain["strike"].tolist(),
         call_price_list=matched_chain["call_mid"].tolist(),
@@ -246,7 +241,7 @@ try:
     selected_iv_for_comparison = model_iv
     comparison_cols = st.columns(4)
     comparison_cols[0].metric("Selected model IV", f"{selected_iv_for_comparison:.2%}")
-    comparison_cols[1].metric("VIX-style", f"{indicator_result['VIX']['vix']:.2f}")
+    comparison_cols[1].metric("VIX ", f"{indicator_result['VIX']['vix']:.2f}")
     comparison_cols[2].metric("SVIX", f"{indicator_result['SVIX']['svix']:.2f}")
     comparison_cols[3].metric("VIX - SVIX", f"{indicator_result['VIX']['vix'] - indicator_result['SVIX']['svix']:.2f}")
 except Exception as exc:
@@ -266,10 +261,10 @@ try:
         option_kind=option_kind,
         skip_errors=True,
     )
-    forward = spot * math.exp((risk_free_rate - dividend_yield) * T)
+    forward = estimate_forward_price(matched_chain, risk_free_rate, T)["F"]
     svi = fit_svi_smile(smile_x, smile_iv, forward, T)
     fig, ax = plt.subplots()
-    ax.scatter(smile_x, smile_iv * 100, label="Market BS IV", s=18)
+    ax.scatter(smile_x, smile_iv * 100, label="Market IV", s=18)
     ax.plot(svi["smooth_strikes"], svi["smooth_iv"] * 100, label="SVI fit", linewidth=2)
     ax.axvline(spot, color="gray", linestyle="--", linewidth=1)
     ax.set_xlabel("Strike")
@@ -284,7 +279,7 @@ except Exception as exc:
 trend = moving_average_trend(history)
 
 st.subheader("Strategy Selection")
-st.caption("Strategy score is based on rolling backtest metrics. It is not financial advice.")
+st.caption("Strategy score is based on rolling backtest metrics.")
 
 strategy = st.selectbox(
     "Strategy",
@@ -296,6 +291,8 @@ strategy = st.selectbox(
         "Short Strangle",
         "Long Call Butterfly",
         "Short Call Butterfly",
+        "Long Put Butterfly",
+        "Short Put Butterfly",
         "Custom",
     ],
 )
@@ -346,6 +343,8 @@ strategy_candidates = [
     "Short Strangle",
     "Long Call Butterfly",
     "Short Call Butterfly",
+    "Long Put Butterfly",
+    "Short Put Butterfly",
 ]
 strategy_results = {}
 ranking_other_strike = locals().get("other_strike", None)
@@ -389,11 +388,15 @@ with plot_left:
 
 with plot_right:
     fig, ax = plt.subplots()
-    ax.hist(backtest["strategy_profit"], bins=30)
-    ax.axvline(0, color="black", linewidth=1)
-    ax.set_xlabel("Scenario profit")
-    ax.set_ylabel("Count")
-    ax.set_title("Historical scenario backtest")
+    backtest_plot = backtest.copy()
+    backtest_plot["cumulative_pnl"] = backtest_plot["strategy_profit"].cumsum()
+    ax.plot(backtest_plot.index, backtest_plot["strategy_profit"], label="Period PnL", linewidth=1)
+    ax.plot(backtest_plot.index, backtest_plot["cumulative_pnl"], label="Cumulative PnL", linewidth=2)
+    ax.axhline(0, color="black", linewidth=1)
+    ax.set_xlabel("Exit date")
+    ax.set_ylabel("PnL")
+    ax.set_title("Rolling backtest PnL")
+    ax.legend()
     st.pyplot(fig)
 
 summary_cols = st.columns(5)
@@ -409,4 +412,6 @@ more_cols[1].metric("Return on margin", f"{metrics['return_on_margin']:.2%}")
 more_cols[2].metric("Worst scenario", f"{metrics['worst_scenario']:.2f}")
 more_cols[3].metric("Best scenario", f"{metrics['best_scenario']:.2f}")
 
-st.dataframe(backtest.tail(30), use_container_width=True)
+backtest_display = backtest.copy()
+backtest_display["cumulative_pnl"] = backtest_display["strategy_profit"].cumsum()
+st.dataframe(backtest_display.tail(30), use_container_width=True)

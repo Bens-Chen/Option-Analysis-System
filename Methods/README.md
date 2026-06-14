@@ -42,7 +42,6 @@ The folder includes:
 - `Combinatorial_european_price`: a European-only combinatorial version
 - `CRR_BS`: a hybrid binomial Black-Scholes method with quicker convergence time compared to CRR
 
-
 CRR is one of the most versatile methods in this repo. It can price European and American options, and it can be adapted to some exotic options such as Asian or Lookback options. The pricing logic is similar across products, but the state variables and code structure can become different when the payoff is path dependent.
 
 ## Monte Carlo

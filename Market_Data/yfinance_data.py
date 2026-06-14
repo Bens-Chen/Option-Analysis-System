@@ -91,12 +91,19 @@ def fetch_option_chain(ticker, expiration=None):
 
 
 def option_mid_price(row):
-    bid = float(row.get("bid", 0) or 0)
-    ask = float(row.get("ask", 0) or 0)
-    last = float(row.get("lastPrice", 0) or 0)
+    bid = _clean_option_price(row.get("bid", 0))
+    ask = _clean_option_price(row.get("ask", 0))
+    last = _clean_option_price(row.get("lastPrice", 0))
     if bid > 0 and ask > 0:
         return (bid + ask) / 2
     return last
+
+
+def _clean_option_price(value):
+    price = pd.to_numeric(value, errors="coerce")
+    if pd.isna(price) or not math.isfinite(float(price)) or float(price) <= 0:
+        return 0.0
+    return float(price)
 
 
 def add_mid_prices(option_table):
@@ -108,6 +115,8 @@ def add_mid_prices(option_table):
 def matched_option_chain_prices(calls, puts):
     calls = add_mid_prices(calls)
     puts = add_mid_prices(puts)
+    calls["strike"] = pd.to_numeric(calls["strike"], errors="coerce")
+    puts["strike"] = pd.to_numeric(puts["strike"], errors="coerce")
     call_cols = calls[["strike", "midPrice", "impliedVolatility"]].rename(
         columns={"midPrice": "call_mid", "impliedVolatility": "call_yfinance_iv"}
     )
@@ -118,6 +127,61 @@ def matched_option_chain_prices(calls, puts):
     merged = merged.dropna(subset=["strike", "call_mid", "put_mid"])
     merged = merged[(merged["call_mid"] > 0) & (merged["put_mid"] > 0)]
     return merged.sort_values("strike").reset_index(drop=True)
+
+
+def estimate_forward_price(matched_prices, risk_free_rate, time_to_maturity):
+    """Estimate the option-implied forward using put-call parity.
+
+    For a matched call and put with the same strike and maturity:
+    C - P = exp(-rT) * (F - K), so F = K + exp(rT) * (C - P).
+    The reference strike is the row where call and put prices are closest.
+    """
+    if time_to_maturity <= 0:
+        raise ValueError("time_to_maturity must be positive.")
+
+    required_columns = {"strike", "call_mid", "put_mid"}
+    missing_columns = required_columns.difference(matched_prices.columns)
+    if missing_columns:
+        missing = ", ".join(sorted(missing_columns))
+        raise ValueError(f"matched_prices is missing required columns: {missing}")
+
+    table = matched_prices.copy()
+    for column in ["strike", "call_mid", "put_mid"]:
+        table[column] = pd.to_numeric(table[column], errors="coerce")
+    table = table.dropna(subset=["strike", "call_mid", "put_mid"])
+    table = table[(table["strike"] > 0) & (table["call_mid"] > 0) & (table["put_mid"] > 0)]
+    if table.empty:
+        raise ValueError("No matched call/put prices are available to estimate forward price.")
+
+    table["call_put_diff_abs"] = (table["call_mid"] - table["put_mid"]).abs()
+    reference = table.sort_values(["call_put_diff_abs", "strike"]).iloc[0]
+    discount_growth = math.exp(float(risk_free_rate) * float(time_to_maturity))
+    forward = float(reference["strike"] + discount_growth * (reference["call_mid"] - reference["put_mid"]))
+
+    if not math.isfinite(forward) or forward <= 0:
+        raise ValueError("Estimated forward price must be positive.")
+
+    return {
+        "F": forward,
+        "reference_strike": float(reference["strike"]),
+        "call_mid": float(reference["call_mid"]),
+        "put_mid": float(reference["put_mid"]),
+        "call_put_diff": float(reference["call_mid"] - reference["put_mid"]),
+        "risk_free_growth": discount_growth,
+    }
+
+
+def build_vix_svix_inputs(calls, puts, risk_free_rate, time_to_maturity):
+    matched = matched_option_chain_prices(calls, puts)
+    forward = estimate_forward_price(matched, risk_free_rate, time_to_maturity)
+    return {
+        "K_list": matched["strike"].astype(float).tolist(),
+        "call_price_list": matched["call_mid"].astype(float).tolist(),
+        "put_price_list": matched["put_mid"].astype(float).tolist(),
+        "F": forward["F"],
+        "forward": forward,
+        "matched_prices": matched,
+    }
 
 
 def build_option_inputs(
