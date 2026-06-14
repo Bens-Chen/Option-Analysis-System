@@ -85,7 +85,7 @@ $$
 \Theta + (r-q)S\Delta + \frac{1}{2}\sigma^2S^2\Gamma = rf
 $$
 
-For a delta-neutral portfolio $\delta$ = 0 :
+For a delta-neutral portfolio $\Delta$ = 0 :
 
 $$
 \Theta + \frac{1}{2}\sigma^2S^2\Gamma = rf
