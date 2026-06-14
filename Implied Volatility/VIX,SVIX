@@ -1,0 +1,131 @@
+import math
+
+
+# VIX
+def VIX(r, T_minus_t, K_list, F, call_price_list, put_price_list):
+    if T_minus_t <= 0:
+        raise ValueError("T_minus_t must be positive.")
+
+    option_data = sorted(zip(K_list, call_price_list, put_price_list))
+    K_list = [row[0] for row in option_data]
+    call_price_list = [row[1] for row in option_data]
+    put_price_list = [row[2] for row in option_data]
+
+    K0 = max([K for K in K_list if K <= F])
+
+    summation = 0
+
+    for i in range(len(K_list)):
+        K = K_list[i]
+
+        if i == 0:
+            delta_K = K_list[i + 1] - K_list[i]
+        elif i == len(K_list) - 1:
+            delta_K = K_list[i] - K_list[i - 1]
+        else:
+            delta_K = (K_list[i + 1] - K_list[i - 1]) / 2
+
+        if K < K0:
+            Q_K = put_price_list[i]
+        elif K > K0:
+            Q_K = call_price_list[i]
+        else:
+            Q_K = (call_price_list[i] + put_price_list[i]) / 2
+
+        # Python uses ** for power. K^2 is not square in Python.
+        summation += delta_K / (K**2) * math.exp(r * T_minus_t) * Q_K
+
+    sigma_square = 2 / T_minus_t * summation
+    sigma_square -= 1 / T_minus_t * ((F / K0) - 1) ** 2
+
+    if sigma_square < 0:
+        raise ValueError("VIX variance is negative. Check option prices and F.")
+
+    vix = math.sqrt(sigma_square) * 100
+
+    return {
+        "variance": sigma_square,
+        "vix": vix,
+        "K0": K0,
+        "F": F,
+    }
+
+
+# SVIX
+def SVIX(St, r, T, K_list, F, call_price_list, put_price_list):
+    if T <= 0:
+        raise ValueError("T must be positive.")
+    if St <= 0:
+        raise ValueError("St must be positive.")
+
+    option_data = sorted(zip(K_list, call_price_list, put_price_list))
+    K_list = [row[0] for row in option_data]
+    call_price_list = [row[1] for row in option_data]
+    put_price_list = [row[2] for row in option_data]
+
+    K0 = max([K for K in K_list if K <= F])
+
+    summation = 0
+
+    for i in range(len(K_list)):
+        K = K_list[i]
+
+        if i == 0:
+            delta_K = K_list[i + 1] - K_list[i]
+        elif i == len(K_list) - 1:
+            delta_K = K_list[i] - K_list[i - 1]
+        else:
+            delta_K = (K_list[i + 1] - K_list[i - 1]) / 2
+
+        if K < K0:
+            Q_K = put_price_list[i]
+        elif K > K0:
+            Q_K = call_price_list[i]
+        else:
+            Q_K = (call_price_list[i] + put_price_list[i]) / 2
+
+        summation += delta_K * Q_K
+
+    Rf = math.exp(r * T)
+    svix_square = 2 / (T * Rf * St**2) * summation
+
+    if svix_square < 0:
+        raise ValueError("SVIX variance is negative. Check option prices and F.")
+
+    svix = math.sqrt(svix_square) * 100
+
+    return {
+        "variance": svix_square,
+        "svix": svix,
+        "K0": K0,
+        "F": F,
+    }
+
+
+def VIX_SVIX(St, r, q, sigma, T, K_list, call_price_list, put_price_list, F=None):
+    if F is None:
+        F = St * math.exp((r - q) * T)
+
+    return {
+        "VIX": VIX(r, T, K_list, F, call_price_list, put_price_list),
+        "SVIX": SVIX(St, r, T, K_list, F, call_price_list, put_price_list),
+    }
+
+
+if __name__ == "__main__":
+    K_list = [90, 95, 100, 105, 110]
+    call_price_list = [12.0, 8.0, 5.0, 2.8, 1.4]
+    put_price_list = [1.2, 2.5, 4.8, 7.6, 11.0]
+
+    result = VIX_SVIX(
+        St=100,
+        r=0.04,
+        q=0.0,
+        sigma=0.2,
+        T=30 / 365,
+        K_list=K_list,
+        call_price_list=call_price_list,
+        put_price_list=put_price_list,
+    )
+
+    print(result)

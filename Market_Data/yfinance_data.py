@@ -90,6 +90,36 @@ def fetch_option_chain(ticker, expiration=None):
     }
 
 
+def option_mid_price(row):
+    bid = float(row.get("bid", 0) or 0)
+    ask = float(row.get("ask", 0) or 0)
+    last = float(row.get("lastPrice", 0) or 0)
+    if bid > 0 and ask > 0:
+        return (bid + ask) / 2
+    return last
+
+
+def add_mid_prices(option_table):
+    table = option_table.copy()
+    table["midPrice"] = table.apply(option_mid_price, axis=1)
+    return table
+
+
+def matched_option_chain_prices(calls, puts):
+    calls = add_mid_prices(calls)
+    puts = add_mid_prices(puts)
+    call_cols = calls[["strike", "midPrice", "impliedVolatility"]].rename(
+        columns={"midPrice": "call_mid", "impliedVolatility": "call_yfinance_iv"}
+    )
+    put_cols = puts[["strike", "midPrice", "impliedVolatility"]].rename(
+        columns={"midPrice": "put_mid", "impliedVolatility": "put_yfinance_iv"}
+    )
+    merged = pd.merge(call_cols, put_cols, on="strike", how="inner")
+    merged = merged.dropna(subset=["strike", "call_mid", "put_mid"])
+    merged = merged[(merged["call_mid"] > 0) & (merged["put_mid"] > 0)]
+    return merged.sort_values("strike").reset_index(drop=True)
+
+
 def build_option_inputs(
     ticker,
     strike,

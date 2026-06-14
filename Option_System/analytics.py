@@ -1,6 +1,7 @@
 import math
 
 from scipy.optimize import brentq
+from scipy.optimize import curve_fit
 from scipy.stats import norm
 
 from Methods.black_scholes import BS
@@ -84,6 +85,60 @@ def implied_volatility_from_price(
 def crr_option_price(S, K, r, q, sigma, T, option_kind, option_style="American", steps=200):
     call, put = CRR_O_n(S, K, r, q, sigma, T, steps, option_type=option_style)
     return call if option_kind == "call" else put
+
+
+def svi_total_variance(log_moneyness, a, b, rho, m, sigma):
+    k = log_moneyness
+    return a + b * (rho * (k - m) + ((k - m) ** 2 + sigma**2) ** 0.5)
+
+
+def fit_svi_smile(strikes, implied_volatilities, forward, T):
+    """Fit raw SVI to discrete IV points and return smooth smile data."""
+    import numpy as np
+
+    strikes = np.asarray(strikes, dtype=float)
+    implied_volatilities = np.asarray(implied_volatilities, dtype=float)
+    valid = (
+        np.isfinite(strikes)
+        & np.isfinite(implied_volatilities)
+        & (strikes > 0)
+        & (implied_volatilities > 0)
+    )
+    strikes = strikes[valid]
+    implied_volatilities = implied_volatilities[valid]
+    if len(strikes) < 5:
+        raise ValueError("At least five valid IV points are recommended for SVI fitting.")
+
+    k = np.log(strikes / forward)
+    total_variance = implied_volatilities**2 * T
+    initial = [max(float(total_variance.min()), 1e-6), 0.1, -0.3, 0.0, 0.2]
+    lower = [0.0, 1e-6, -0.999, -5.0, 1e-6]
+    upper = [10.0, 10.0, 0.999, 5.0, 10.0]
+
+    params, _ = curve_fit(
+        svi_total_variance,
+        k,
+        total_variance,
+        p0=initial,
+        bounds=(lower, upper),
+        maxfev=20000,
+    )
+
+    smooth_strikes = np.linspace(float(strikes.min()), float(strikes.max()), 100)
+    smooth_k = np.log(smooth_strikes / forward)
+    smooth_total_variance = svi_total_variance(smooth_k, *params)
+    smooth_iv = np.sqrt(np.maximum(smooth_total_variance / T, 0))
+    return {
+        "params": {
+            "a": float(params[0]),
+            "b": float(params[1]),
+            "rho": float(params[2]),
+            "m": float(params[3]),
+            "sigma": float(params[4]),
+        },
+        "smooth_strikes": smooth_strikes,
+        "smooth_iv": smooth_iv,
+    }
 
 
 def crr_greeks_by_bump(

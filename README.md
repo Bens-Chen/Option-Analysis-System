@@ -64,17 +64,16 @@ Greak Letters/
 
 Market_Data/
   README.md                  # yfinance data connection notes
-  yfinance_data.py           # price history, option chain, volatility inputs
+  yfinance_data.py
 
 Option_System/
   README.md                  # interactive option search and strategy system
-  analytics.py               # IV, BS Greeks, and American CRR Greek calculations
-  strategy_engine.py         # strategy payoff, butterfly spreads, scoring, scenario backtest
-  app.py                     # Streamlit app
+  analytics.py
+  strategy_engine.py
+  app.py
 
 Trading_Strategies/
-  README.md                  # interval, butterfly, straddle, strangle, ADR arbitrage
-  adr_arbitrage.py
+  README.md                  # interval, butterfly, straddle, strangle
   butterfly.py
   interval_trading.py
   payoffs.py

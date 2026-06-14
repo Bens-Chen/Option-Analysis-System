@@ -1,23 +1,27 @@
 import numpy as np
-import math
 import sys
-#BS and CRR pls construct by urself
+from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from Methods.black_scholes import BS
+from Methods.crr import CRR_O_n
 
 # Bisection method
 def Bisection(S, K, r, q, T, market_price_option, n, an, bn):
-     
+
      function_bs_call = lambda sigma: BS(S, K, r, q, sigma, T)[0] - market_price_option
      function_bs_put = lambda sigma: BS(S,K,r,q,sigma,T)[1] - market_price_option
 
-     function_crr_european_call = lambda sigma: CRR(S, K, r, q, sigma, T, n, option_type='European')[0] - market_price_option
-     function_crr_european_put = lambda sigma: CRR(S, K, r, q, sigma, T, n, option_type='European')[1] - market_price_option 
+     function_crr_european_call = lambda sigma: CRR_O_n(S, K, r, q, sigma, T, n, option_type='European')[0] - market_price_option
+     function_crr_european_put = lambda sigma: CRR_O_n(S, K, r, q, sigma, T, n, option_type='European')[1] - market_price_option
 
-     function_crr_american_call = lambda sigma: CRR(S, K, r, q, sigma, T, n, option_type='American')[0] - market_price_option    
-     function_crr_american_put = lambda sigma: CRR(S, K, r, q, sigma, T, n, option_type='American')[1] - market_price_option
+     function_crr_american_call = lambda sigma: CRR_O_n(S, K, r, q, sigma, T, n, option_type='American')[0] - market_price_option
+     function_crr_american_put = lambda sigma: CRR_O_n(S, K, r, q, sigma, T, n, option_type='American')[1] - market_price_option
 
      def bisection_loop(f, label):
-        a, b = an, bn   
+        a, b = an, bn
         for i in range(1000):
             if abs(f(a)) < 0.0000001 or abs(f(b)) < 0.0000001:
                 print(f"Implied Volatility for {label}:", a if abs(f(a)) < 0.0000001 else b)
@@ -44,11 +48,11 @@ def Newtons(S, K, r, q, T, market_price_option, n, initial_guess,convergence_cri
     function_bs_call = lambda sigma: BS(S, K, r, q, sigma, T)[0] - market_price_option
     function_bs_put = lambda sigma: BS(S,K,r,q,sigma,T)[1] - market_price_option
 
-    function_crr_european_call = lambda sigma: CRR(S, K, r, q, sigma, T, n, option_type='European')[0] - market_price_option
-    function_crr_european_put = lambda sigma: CRR(S, K, r, q, sigma, T, n, option_type='European')[1] - market_price_option 
+    function_crr_european_call = lambda sigma: CRR_O_n(S, K, r, q, sigma, T, n, option_type='European')[0] - market_price_option
+    function_crr_european_put = lambda sigma: CRR_O_n(S, K, r, q, sigma, T, n, option_type='European')[1] - market_price_option
 
-    function_crr_american_call = lambda sigma: CRR(S, K, r, q, sigma, T, n, option_type='American')[0] - market_price_option    
-    function_crr_american_put = lambda sigma: CRR(S, K, r, q, sigma, T, n, option_type='American')[1] - market_price_option
+    function_crr_american_call = lambda sigma: CRR_O_n(S, K, r, q, sigma, T, n, option_type='American')[0] - market_price_option
+    function_crr_american_put = lambda sigma: CRR_O_n(S, K, r, q, sigma, T, n, option_type='American')[1] - market_price_option
 
     def newton_loop(f,label):
         x_n = initial_guess

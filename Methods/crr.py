@@ -125,7 +125,7 @@ def CRR_BS(S, K, r, q, sigma, T, n, option_type='European'):
     call_prices = np.zeros(n)
     for j in range(n):
         S_ij = S * (u**j) * (d**(n-1-j))  
-        call_prices[j] = BS(S_ij, K, r, q, sigma, dt)[0] #BS formula can direcly use Black_Scholes
+        call_prices[j] = BS(S_ij, K, r, q, sigma, dt)[0]
     
     # Backward induction 
     for i in range(n-2, -1, -1):

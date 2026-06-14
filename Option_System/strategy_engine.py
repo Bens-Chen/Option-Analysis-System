@@ -217,6 +217,87 @@ def historical_scenario_backtest(price_history, spot, legs, holding_days=20):
     )
 
 
+def rolling_strategy_backtest(price_history, current_spot, legs, holding_days=1):
+    """Re-enter the same relative option structure through history.
+
+    yfinance does not provide historical option chains here, so each leg is
+    scaled by current strike/spot and premium/spot. This keeps the selected
+    DTE rolling through the historical stock path.
+    """
+    close = price_history["Close"].dropna().astype(float)
+    if holding_days < 1:
+        raise ValueError("holding_days must be at least 1.")
+    if len(close) <= holding_days:
+        raise ValueError("Not enough price history for rolling backtest.")
+
+    rows = []
+    for i in range(len(close) - holding_days):
+        entry_date = close.index[i]
+        exit_date = close.index[i + holding_days]
+        entry_spot = float(close.iloc[i])
+        terminal_price = float(close.iloc[i + holding_days])
+
+        rolling_legs = []
+        for leg in legs:
+            rolling_legs.append(
+                {
+                    "option_kind": leg["option_kind"],
+                    "side": leg["side"],
+                    "strike": entry_spot * float(leg["strike"]) / current_spot,
+                    "premium": entry_spot * float(leg["premium"]) / current_spot,
+                    "quantity": int(leg.get("quantity", 1)),
+                }
+            )
+
+        profit = float(strategy_profit([terminal_price], rolling_legs)[0])
+        margin = estimate_strategy_margin(rolling_legs, entry_spot)
+        rows.append(
+            {
+                "entry_date": entry_date,
+                "exit_date": exit_date,
+                "entry_spot": entry_spot,
+                "terminal_price": terminal_price,
+                "historical_return": terminal_price / entry_spot - 1,
+                "strategy_profit": profit,
+                "margin_estimate": margin,
+            }
+        )
+
+    return pd.DataFrame(rows).set_index("exit_date")
+
+
+def rank_strategies_by_backtest(strategy_results):
+    rows = []
+    for strategy_name, result in strategy_results.items():
+        metrics = result["metrics"]
+        sharpe = metrics.get("sharpe_ratio", np.nan)
+        return_on_margin = metrics.get("return_on_margin", np.nan)
+        mdd = metrics.get("mdd", np.nan)
+        win_rate = metrics.get("win_rate", np.nan)
+        score = 0.0
+        if np.isfinite(sharpe):
+            score += sharpe * 35
+        if np.isfinite(return_on_margin):
+            score += return_on_margin * 100
+        if np.isfinite(win_rate):
+            score += win_rate * 25
+        if np.isfinite(mdd):
+            score += mdd * 0.05
+        rows.append(
+            {
+                "strategy": strategy_name,
+                "score": round(float(score), 2),
+                "sharpe_ratio": sharpe,
+                "mdd": mdd,
+                "margin_estimate": metrics.get("margin_estimate", np.nan),
+                "return_on_margin": return_on_margin,
+                "win_rate": win_rate,
+                "avg_pnl": metrics.get("avg_pnl", np.nan),
+            }
+        )
+    return pd.DataFrame(rows).sort_values("score", ascending=False)
+
+
 def estimate_strategy_margin(legs, spot, width=0.8):
     grid = payoff_grid(spot, legs, width=width, points=401)
     worst_profit = float(grid["strategy_profit"].min())

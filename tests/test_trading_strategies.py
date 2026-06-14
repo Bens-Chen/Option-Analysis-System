@@ -1,6 +1,5 @@
 import numpy as np
 
-from Trading_Strategies.adr_arbitrage import adr_premium_ratio, adr_signal
 from Trading_Strategies.butterfly import call_butterfly_profit
 from Trading_Strategies.interval_trading import interval_position, interval_trade_plan
 from Trading_Strategies.straddle import long_straddle_profit, short_straddle_profit
@@ -49,19 +48,3 @@ def test_strangle_long_and_short_are_opposites():
     short_profit = short_strangle_profit(120, 90, 110, 4, 5)
 
     assert long_profit == -short_profit
-
-
-def test_adr_arbitrage_signal_for_expensive_adr():
-    premium = adr_premium_ratio(
-        adr_price_usd=8,
-        local_share_price=40,
-        shares_per_adr=5,
-        exchange_rate=30,
-    )
-    signal = adr_signal(premium, long_term_average=0.20, upper_bound=0.25, lower_bound=0.15)
-
-    assert premium == 0.20
-    assert signal["signal"] == "hold"
-
-    signal = adr_signal(0.26, long_term_average=0.20, upper_bound=0.25, lower_bound=0.15)
-    assert signal["signal"] == "long_local_short_adr"

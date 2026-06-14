@@ -85,7 +85,7 @@ $$
 \Theta + (r-q)S\Delta + \frac{1}{2}\sigma^2S^2\Gamma = rf
 $$
 
-For a delta-neutral portfolio:
+For a delta-neutral portfolio $\delta$ = 0 :
 
 $$
 \Theta + \frac{1}{2}\sigma^2S^2\Gamma = rf
@@ -97,10 +97,9 @@ High gamma is attractive, but it usually comes with faster time decay.
 
 `CRR` estimates Delta, Gamma, and Theta from CRR tree nodes.
 
-It supports:
 
-- European options
-- American options through early exercise in the tree
+Here introduce two CRR methods:
+
 - one-tree Greek estimation
 - Pelsser and Vorst extended-tree style estimation
 
@@ -114,15 +113,6 @@ The estimates are taken from nearby tree nodes. This avoids pricing the whole op
 
 The Pelsser and Vorst extended tree improves the node layout for Greek estimation, but it is still mainly applicable to $\Delta$, $\Gamma$, and $\Theta$.
 
-Finite difference can also estimate Greeks:
-
-$$
-\frac{\partial f}{\partial S_0}
-\approx
-\frac{f(S_0+\Delta S)-f(S_0-\Delta S)}{2\Delta S}
-$$
-
-However, a smaller $\Delta S$ is not always better in CRR trees because the binomial price can oscillate as tree nodes move closer to or farther from the strike.
 
 ## Monte Carlo Greeks
 
@@ -162,18 +152,5 @@ C_t = \Delta_t S_t - B_t
 $$
 
 For a call option issuer, the hedge buys more shares when delta rises and sells shares when delta falls. With continuous rebalancing, constant volatility, and no transaction costs, the hedging cost approaches the Black-Scholes price. In practice, option issuers charge a markup because these assumptions do not hold exactly.
-
-The theoretical replication relationship is:
-
-$$
-C_t = \Delta_t S_t - B_t
-$$
-
-In practice, option issuers usually sell options above the theoretical Black-Scholes value because:
-
-- rebalancing cannot happen continuously
-- realized volatility may differ from the estimated volatility
-- transaction costs increase hedging cost
-- the issuer needs compensation for running the business
 
 If a call option is underpriced, an inverted delta hedge can reverse the dynamic delta hedge logic. The idea is to buy the cheap call and trade the underlying in the opposite way to exploit the pricing gap.
