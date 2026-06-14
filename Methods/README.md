@@ -28,38 +28,22 @@ $$
 
 Black-Scholes is the cleanest starting point because it gives a closed-form benchmark for European vanilla options.
 
-It is the most typical closed-form pricing model. If an option payoff is not the same as a vanilla call or put, the pricing formula may still be derived by martingale pricing instead of directly solving a PDE.
+It is the most typical closed-form pricing model. If an option payoff is not the same as a vanilla call or put, the pricing formula may still be derived by martingale pricing method instead of directly solving a PDE.
 
-Martingale pricing is another way to derive Black-Scholes-style formulas. The hard part is changing from the real-world probability measure to the risk-neutral measure. Under risk-neutral valuation, the pricing measure treats discounted asset prices as martingales, so European option values can be derived from discounted expected payoff.
 
 ## CRR Binomial Tree
 
 `crr.py` implements CRR binomial tree pricing.
-
-CRR is useful because it can handle:
-
-- European options
-- American options with early exercise
-- some exotic options when the tree state is extended
 
 The folder includes:
 
 - `CRR_O_n2`: a full two-dimensional tree implementation
 - `CRR_O_n`: a memory-efficient one-dimensional implementation
 - `Combinatorial_european_price`: a European-only combinatorial version
-- `CRR_BS`: a hybrid binomial Black-Scholes method
+- `CRR_BS`: a hybrid binomial Black-Scholes method with quicker convergence time compared to CRR
 
-The project keeps two basic CRR implementations with different memory usage:
-
-- $O(n^2)$ tree storage
-- $O(n)$ rolling array storage
 
 CRR is one of the most versatile methods in this repo. It can price European and American options, and it can be adapted to some exotic options such as Asian or Lookback options. The pricing logic is similar across products, but the state variables and code structure can become different when the payoff is path dependent.
-
-Related CRR-style ideas:
-
-- Combinatorial method: useful for European options
-- Binomial Black-Scholes: apply the Black-Scholes formula near the last step to reduce convergence time
 
 ## Monte Carlo
 
