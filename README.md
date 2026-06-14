@@ -6,7 +6,7 @@ This repository is an option-pricing project. It introduces classic pricing meth
 
 - Methods: Black-Scholes, CRR, Monte Carlo and Finite Difference
 - Greek Letters estimation
-- Implied Volatility calibration
+- Implied volatility calibration
 - Exotic option : Asian, Lookback, and Rainbow options
 - Option Trading Strateies 
 - Market Data: yfinance connection for price history, option chains, IV, and contract search
@@ -46,9 +46,11 @@ pytest
 ## Project Structure
 
 ```text
-Calibration/
-  README.md                  # implied volatility and calibration notes
-  implied_volatility.py
+Implied_Volatility/
+  README.md                  # implied volatility, IV smile, VIX, and SVIX notes
+  constant_IV.py
+  iv_smile.py
+  VIX,SVIX
 
 Exotic_Options/
   README.md                  # Asian, Lookback, and Rainbow option notes
@@ -56,11 +58,10 @@ Exotic_Options/
   lookback_option.py
   rainbow_option.py
 
-Greak Letters/
+Greak_Letters/
   README.md                  # Greeks and hedging notes
   CRR                        # CRR Greek calculations
   Monte-Carlo                # pathwise and likelihood Monte Carlo Greeks
-  Dynamic delta hedge
 
 Market_Data/
   README.md                  # yfinance data connection notes
@@ -104,8 +105,8 @@ tests/
 
 1. Start with `Methods/README.md` to understand the pricing methods.
 2. Read `Market_Data/README.md` to see how real market data is pulled from yfinance.
-3. Read `Calibration/README.md` for implied volatility.
-4. Read `Greak Letters/README.md` for Greeks and hedging.
+3. Read `Implied_Volatility/README.md` for implied volatility, IV smile, VIX, and SVIX.
+4. Read `Greak_Letters/README.md` for Greeks and hedging.
 5. Read `Trading_Strategies/README.md` for selected trading strategies.
 6. Read `Option_System/README.md` for the interactive option-search system.
 7. Check `examples/` and `tests/` to see how the code is used.
