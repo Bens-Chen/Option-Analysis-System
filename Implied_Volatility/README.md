@@ -1,0 +1,336 @@
+# Implied Volatility
+
+This folder contains implied volatility, IV smile, VIX, and SVIX notes and code.
+
+## Mean Estimation
+
+Two return averages are often confused:
+
+- Geometric log return: estimates the lognormal drift adjustment.
+- Arithmetic return: estimates the simple average growth rate.
+
+When assuming a lognormal stock-price model, this distinction matters because:
+
+$$
+E[\ln(S_T/S_0)]
+$$
+
+and
+
+$$
+\ln(E[S_T/S_0])
+$$
+
+are not the same.
+
+More explicitly:
+
+- $E(\ln(S_T/S_0))$: geometric mean of daily log returns. Under a lognormal model, it is connected to $\mu - 0.5\sigma^2$.
+- $\ln(E[S_T/S_0])$: arithmetic-return view. It is connected to $\mu$, but it is not the same object as the expected log return.
+
+This distinction matters when estimating parameters for a lognormal stock-price process.
+
+## Implied Volatility
+
+Historical volatility is backward-looking. Option prices often imply a forward-looking volatility.
+
+Implied volatility solves:
+
+$$
+f(\sigma_{imp}) = c(S_0,K,r,q,\sigma_{imp},T) - C_{market} = 0
+$$
+
+The important point is that the market price is the target. Black-Scholes is used as a conversion tool:
+
+`constant_IV.py` contains bisection and Newton-style implied volatility routines.
+
+### Bisection Method
+
+First find an interval $[a_n,b_n]$ such that:
+
+$$
+f(a_n)f(b_n) < 0
+$$
+
+Then calculate:
+
+$$
+x_n = a_n + \frac{b_n-a_n}{2}
+$$
+
+If:
+
+$$
+f(a_n)f(x_n) < 0
+$$
+
+then set:
+
+$$
+a_{n+1}=a_n,\quad b_{n+1}=x_n
+$$
+
+Otherwise set:
+
+$$
+a_{n+1}=x_n,\quad b_{n+1}=b_n
+$$
+
+### Newton Method
+
+Newton's method uses a first-order Taylor approximation:
+
+$$
+x_{n+1} = x_n - \frac{f(x_n)}{f'(x_n)}
+$$
+
+It is often faster than bisection, but it can be less stable if the initial guess is poor or the derivative is small.
+
+## IV Smile
+
+In the Black-Scholes model, volatility is assumed to be constant. Under this assumption, options with the same underlying asset and maturity should have the same implied volatility, regardless of strike.
+
+In real option markets, this is usually not true. When we solve implied volatility from market option prices, implied volatility often changes across strikes and maturities. Plotting implied volatility against strike gives a volatility smile or volatility smirk. Plotting it across both strike and maturity gives an implied volatility surface.
+
+
+
+## Calibration Models
+
+Calibration means choosing model parameters so that model prices or model-implied volatilities match observed market prices as closely as possible.
+
+Common model choices include:
+
+- SVI
+- Heston stochastic volatility
+- GARCH 
+- GJR-GARCH
+- GARCH-MIDAS
+- HAR-RV
+- HAR-RV-CJ
+- SVJ / SVJJ
+
+### SVI
+
+SVI is the most direct smile-fitting model among these examples. It parameterizes total implied variance:
+
+$$
+w(k) = a + b\left[\rho(k-m) + \sqrt{(k-m)^2 + \sigma^2}\right]
+$$
+
+where:
+
+- $w(k)$ is total implied variance.
+- $k=\log(K/F)$ is log-moneyness.
+
+SVI is useful because it turns discrete IV smile points into a smooth curve.
+
+### Stochastic Volatility: Heston
+
+Compared with Black-Scholes, Heston relaxes the assumption of constant volatility. Volatility itself becomes a stochastic process.
+
+Heston is a structural pricing model. It can explain smile and skew through stochastic variance and correlation between price shocks and volatility shocks.
+
+
+### GARCH
+
+A vanilla GARCH model is mainly used to model time-varying conditional volatility from historical returns. It can capture volatility clustering.
+
+However, vanilla GARCH does not directly fit a full volatility smile because the smile is a cross-sectional object: it describes how implied volatility changes across different strikes and maturities at the same time.
+
+GARCH-family models can still be useful in option modeling, especially when extended with asymmetric effects or embedded into an option-pricing framework. For example, E-GARCH and GJR-GARCH can capture leverage effects, Heston-Nandi GARCH is designed for option pricing, and GARCH-MIDAS introduces macroeconomic indexes as low-frequency explanatory variables of volatility.
+
+
+## VIX And SVIX
+
+VIX and SVIX are both forward-looking volatility indicators built from option prices, but they measure different objects.
+
+- VIX is connected to a variance swap, a log contract, and risk-neutral entropy.
+- SVIX is connected to a squared contract and the risk-neutral variance of simple returns.
+
+The key idea behind both indicators is static option replication: a smooth payoff $g(S_T)$ can be replicated by a bond, a forward, and a continuum of options across strikes.
+
+$$
+g(S_T) = g(F) +g^{\prime}(F)(S_T - F) +\int_{0}^{F}g^{\prime\prime}(K)(K - S_T)^{+}\,\mathrm{d}K +\int_{F}^{\infty}g^{\prime\prime}(K)(S_T - K )^{+}\,\mathrm{d}K
+$$
+
+The difference between VIX and SVIX comes from choosing a different payoff function $g(S_T)$.
+
+### VIX
+
+The theoretical base of VIX comes from variance swaps. Under the risk-neutral measure $Q$, assume the underlying price follows:
+
+$$
+\frac{\mathrm{d}S_u}{S_u} = r\mathrm{d}u + \sigma_u \mathrm{d}W^{Q}_{u}
+$$
+
+By Ito's lemma:
+
+$$
+\mathrm{d}\log(S_u) = \left(r - \frac{1}{2}\sigma_u^2\right)\mathrm{d}u + \sigma_u \mathrm{d}W^{Q}_{u}
+$$
+
+Rearranging gives:
+
+$$
+\sigma_u^2\mathrm{d}u = 2r\mathrm{d}u - 2\mathrm{d}\log(S_u) + 2\sigma_u\mathrm{d}W^{Q}_{u}
+$$
+
+After integrating from $t$ to $T$ and taking the risk-neutral expectation, the stochastic integral has expectation zero. Therefore, expected realized variance can be linked to a log payoff.
+
+Define:
+
+$$
+g(S_T) = -\log\left(\frac{S_T}{F}\right) + \frac{S_T - F}{F}
+$$
+
+This payoff is chosen because:
+
+$$
+g(F)=0,\quad g'(F)=0,\quad g''(K)=\frac{1}{K^2}
+$$
+
+So the payoff can be replicated by OTM options:
+
+$$
+\text{Price}_t[g(S_T)] =
+\int_{0}^{F}\frac{1}{K^2}P_t(K)\,\mathrm{d}K
++
+\int_{F}^{\infty}\frac{1}{K^2}C_t(K)\,\mathrm{d}K
+$$
+
+Therefore, the continuous model-free implied variance behind VIX is:
+
+$$
+\text{VIX}_T^2 =
+\frac{2e^{rT}}{T}
+\left[
+\int_{0}^{F}\frac{1}{K^2}P_t(K)\,\mathrm{d}K
++
+\int_{F}^{\infty}\frac{1}{K^2}C_t(K)\,\mathrm{d}K
+\right]
+$$
+
+This formula shows the main feature of VIX: option prices are weighted by $\frac{1}{K^2}$. Low-strike put options receive large weights, so VIX is very sensitive to left-tail risk and crash insurance demand.
+
+### Cboe Discrete VIX Formula
+
+The continuous formula assumes options exist at every strike. In real markets, strikes are discrete, so Cboe approximates the integral by a summation:
+
+$$
+\sigma^2 =
+\frac{2}{T}
+\sum_i
+\frac{\Delta K_i}{K_i^2}
+e^{rT}Q(K_i)-
+\frac{1}{T}
+\left(\frac{F}{K_0}-1\right)^2
+$$
+
+The published VIX then interpolates between two nearby maturities to target a 30-day horizon, takes the square root, and multiplies by 100.
+
+### SVIX
+
+SVIX uses a different payoff. Instead of a log contract, start from the squared contract:
+
+$$
+g(S_T) = (S_T - F)^2
+$$
+
+For this payoff:
+
+$$
+g(F)=0,\quad g'(F)=0,\quad g''(K)=2
+$$
+
+Using the static replication formula:
+
+$$
+\text{Price}_t[(S_T-F)^2]=
+2\left[\int_{0}^{F}P_t(K)\,\mathrm{d}K+\int_{F}^{\infty}C_t(K)\,\mathrm{d}K\right]
+$$
+
+Multiplying by the risk-free gross return $R_f=e^{rT}$ gives the risk-neutral expectation:
+
+$$
+E_t^Q[(S_T-F)^2] =
+2R_f
+\left[
+\int_{0}^{F}P_t(K)\,\mathrm{d}K +
+\int_{F}^{\infty}C_t(K)\,\mathrm{d}K
+\right]
+$$
+
+Since $F=R_fS_t$, the normalized squared excess simple return is:
+
+$$
+\left(\frac{S_T}{F}-1\right)^2 =
+\frac{(S_T-F)^2}{R_f^2S_t^2}
+$$
+
+Therefore, the annualized SVIX formula is:
+
+$$
+\text{SVIX}_T^2 =
+\frac{2}{TR_fS_t^2}
+\left[
+\int_{0}^{F}P_t(K)\,\mathrm{d}K
++
+\int_{F}^{\infty}C_t(K)\,\mathrm{d}K
+\right]
+$$
+
+For discrete market strikes, the practical approximation is:
+
+$$
+\text{SVIX}_T^2
+\approx
+\frac{2}{TR_fS_t^2}
+\sum_i \Delta K_i Q(K_i)
+$$
+
+### VIX vs SVIX
+
+The largest difference is the option-weighting scheme:
+
+| Indicator | Option weighting | Main interpretation |
+| --- | --- | --- |
+| VIX | Each option price is weighted by $\frac{1}{K^2}$ | Variance swap / log-return / entropy-type risk |
+| SVIX | OTM option prices are integrated over strikes, then scaled by $R_fS_t^2$ | Risk-neutral variance of simple returns |
+
+Because VIX uses $\frac{1}{K^2}$, it gives much larger relative weight to low-strike OTM puts. This makes VIX especially sensitive to downside tail risk and crash insurance.
+
+SVIX is less dominated by deep OTM puts because it does not apply the same $\frac{1}{K^2}$ strike weighting. Relative to VIX, SVIX gives more weight to high-strike OTM calls and is closer to a simple-return variance measure.
+
+So a short interpretation is:
+
+- VIX is more left-tail and crash-risk sensitive.
+- SVIX is a cleaner simple-return risk-neutral variance measure.
+- The gap between VIX and SVIX can contain information about tail risk, skewness, and option-market demand for downside protection.
+
+## Forecast Realized Volatility vs Market IV
+
+Models such as Realized GARCH, GARCH-MIDAS, HAR-RV-CJ, and SVJJ are useful when they are connected to decisions.
+
+For example:
+
+```text
+forecast RV < market IV
+```
+
+may suggest options are expensive relative to expected realized movement.
+
+```text
+forecast RV > market IV
+```
+
+may suggest options are cheap relative to expected realized movement.
+
+This can support:
+
+- volatility risk premium analysis
+- option-selling or option-buying research
+- risk management and volatility targeting
+- event-risk analysis
+- comparing single-stock VIX-style indicators with market IV smiles
+
+The value of volatility forecasting is not only finding the model with the lowest error. The value is using forecast realized volatility as a benchmark for the volatility that the option market is already pricing.

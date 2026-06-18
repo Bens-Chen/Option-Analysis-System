@@ -1,0 +1,513 @@
+from datetime import date
+import importlib.util
+from pathlib import Path
+import sys
+from importlib.machinery import SourceFileLoader
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import streamlit as st
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+IMPLIED_VOL_ROOT = PROJECT_ROOT / "Implied_Volatility"
+if str(IMPLIED_VOL_ROOT) not in sys.path:
+    sys.path.insert(0, str(IMPLIED_VOL_ROOT))
+
+from Market_Data.yfinance_data import (
+    add_mid_prices,
+    download_price_history,
+    estimate_forward_price,
+    estimate_annualized_volatility,
+    fetch_option_chain,
+    filter_option_chain_by_quality,
+    latest_close,
+    matched_option_chain_prices,
+    summarize_option_chain_quality,
+)
+from Option_System.analytics import (
+    black_scholes_greeks,
+    crr_greeks_by_bump,
+    crr_option_price,
+    implied_volatility_from_price,
+    option_price_from_bs,
+)
+from Option_System.strategy_engine import (
+    backtest_metrics,
+    build_chain_strategy_legs,
+    estimate_strategy_margin,
+    moving_average_trend,
+    payoff_grid,
+    rank_strategies_by_backtest,
+    rolling_strategy_backtest,
+)
+from Option_System.research import (
+    build_research_chain_table,
+    event_straddle_analysis,
+    mispricing_scanner,
+    paper_alerts,
+    strategy_robustness_grid,
+    surface_summary,
+    tear_sheet_metrics,
+    volatility_surface_table,
+)
+from Risk_Management.risk_matrix import OptionLeg, build_risk_matrix, plot_risk_matrix
+from Risk_Management.var_es import historical_var_es_summary
+from Risk_Management.vol_curve_monitor import build_demo_vol_curves, plot_vol_curve_monitor
+from iv_smile import IV_smile_arrays, fit_svi_smile
+
+
+def _load_vix_svix_module():
+    module_path = IMPLIED_VOL_ROOT / "VIX,SVIX"
+    if not module_path.exists():
+        module_path = IMPLIED_VOL_ROOT / "vix_svix"
+    loader = SourceFileLoader("vix_svix_module", str(module_path))
+    spec = importlib.util.spec_from_loader("vix_svix_module", loader)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+VIX_SVIX_MODULE = _load_vix_svix_module()
+CRR_STEPS = 10000
+
+
+@st.cache_data(ttl=900)
+def _cached_price_history(ticker, period):
+    return download_price_history(ticker, period=period)
+
+
+@st.cache_data(ttl=900)
+def _cached_option_chain(ticker, expiration=None):
+    return fetch_option_chain(ticker, expiration)
+
+
+def _mid_price(row):
+    bid = float(row.get("bid", 0) or 0)
+    ask = float(row.get("ask", 0) or 0)
+    last = float(row.get("lastPrice", 0) or 0)
+    if bid > 0 and ask > 0:
+        return (bid + ask) / 2
+    return last
+
+
+def _days_to_years(expiration):
+    expiry = pd.to_datetime(expiration).date()
+    days = max((expiry - date.today()).days, 1)
+    return days / 365
+
+
+def _load_market_context(
+    ticker,
+    expiration,
+    option_kind,
+    max_spread_pct,
+    min_open_interest,
+    min_volume,
+    require_bid_ask,
+):
+    history = _cached_price_history(ticker, "5y")
+    spot = latest_close(history)
+    historical_vol = estimate_annualized_volatility(history)
+    chain_preview = _cached_option_chain(ticker)
+    expirations = chain_preview["expirations"]
+    selected_expiration = expiration or expirations[0]
+    chain = _cached_option_chain(ticker, selected_expiration)
+
+    calls_with_mid = filter_option_chain_by_quality(
+        chain["calls"],
+        max_spread_pct=max_spread_pct,
+        min_open_interest=min_open_interest,
+        min_volume=min_volume,
+        require_bid_ask=require_bid_ask,
+    )
+    puts_with_mid = filter_option_chain_by_quality(
+        chain["puts"],
+        max_spread_pct=max_spread_pct,
+        min_open_interest=min_open_interest,
+        min_volume=min_volume,
+        require_bid_ask=require_bid_ask,
+    )
+    if calls_with_mid.empty or puts_with_mid.empty:
+        st.warning("The quote-quality filter removed all calls or puts. Raw yfinance rows are used instead.")
+        calls_with_mid = add_mid_prices(chain["calls"])
+        puts_with_mid = add_mid_prices(chain["puts"])
+
+    chain_table = calls_with_mid if option_kind == "call" else puts_with_mid
+    chain_table = chain_table.copy()
+    chain_table["option_kind"] = option_kind
+    chain_table["distance_from_spot"] = (chain_table["strike"] - spot).abs()
+    chain_table = chain_table.sort_values("distance_from_spot").reset_index(drop=True)
+
+    return {
+        "history": history,
+        "spot": spot,
+        "historical_vol": historical_vol,
+        "expirations": expirations,
+        "expiration": selected_expiration,
+        "chain": chain,
+        "calls_with_mid": calls_with_mid,
+        "puts_with_mid": puts_with_mid,
+        "matched_chain": matched_option_chain_prices(calls_with_mid, puts_with_mid),
+        "chain_table": chain_table,
+    }
+
+
+def _selected_contract_analytics(context, selected_symbol, option_kind, option_style, risk_free_rate, dividend_yield):
+    chain_table = context["chain_table"]
+    selected = chain_table.loc[chain_table["contractSymbol"] == selected_symbol].iloc[0].to_dict()
+    spot = context["spot"]
+    historical_vol = context["historical_vol"]
+    T = _days_to_years(context["expiration"])
+    market_price = _mid_price(selected)
+    yfinance_iv = float(selected.get("impliedVolatility", 0) or 0)
+    pricing_model = "CRR" if option_style == "American" else "BS"
+
+    try:
+        model_iv = implied_volatility_from_price(
+            market_price,
+            spot,
+            float(selected["strike"]),
+            risk_free_rate,
+            dividend_yield,
+            T,
+            option_kind,
+            pricing_model=pricing_model,
+            option_style=option_style,
+            steps=CRR_STEPS,
+        )
+        iv_note = ""
+    except ValueError as exc:
+        model_iv = historical_vol
+        iv_note = f"Could not solve model IV from market price. Historical volatility is used instead. Detail: {exc}"
+
+    if option_style == "American":
+        model_price = crr_option_price(
+            spot,
+            float(selected["strike"]),
+            risk_free_rate,
+            dividend_yield,
+            historical_vol,
+            T,
+            option_kind,
+            option_style="American",
+            steps=CRR_STEPS,
+        )
+        greeks = crr_greeks_by_bump(
+            spot,
+            float(selected["strike"]),
+            risk_free_rate,
+            dividend_yield,
+            model_iv,
+            T,
+            option_kind,
+            option_style="American",
+            steps=CRR_STEPS,
+        )
+    else:
+        model_price = option_price_from_bs(
+            spot,
+            float(selected["strike"]),
+            risk_free_rate,
+            dividend_yield,
+            historical_vol,
+            T,
+            option_kind,
+        )
+        greeks = black_scholes_greeks(
+            spot,
+            float(selected["strike"]),
+            risk_free_rate,
+            dividend_yield,
+            model_iv,
+            T,
+            option_kind,
+        )
+
+    return {
+        "selected": selected,
+        "T": T,
+        "market_price": market_price,
+        "yfinance_iv": yfinance_iv,
+        "model_iv": model_iv,
+        "model_price": model_price,
+        "greeks": greeks,
+        "iv_note": iv_note,
+    }
+
+
+def _render_contract_quote(context, analytics, active_ticker, option_style):
+    st.subheader("Selected Contract Quote")
+    quote_cols = st.columns(4)
+    quote_cols[0].metric("yfinance price", f"{analytics['market_price']:.4f}")
+    quote_cols[1].metric(f"{option_style} model price", f"{analytics['model_price']:.4f}")
+    quote_cols[2].metric("yfinance IV", f"{analytics['yfinance_iv']:.2%}" if analytics["yfinance_iv"] > 0 else "N/A")
+    quote_cols[3].metric("model IV", f"{analytics['model_iv']:.2%}")
+    if analytics["iv_note"]:
+        st.warning(analytics["iv_note"])
+
+    selected = analytics["selected"]
+    meta_cols = st.columns(4)
+    meta_cols[0].metric("Spot", f"{context['spot']:.2f}")
+    meta_cols[1].metric("Strike", f"{float(selected['strike']):.2f}")
+    meta_cols[2].metric("Expiration", context["expiration"])
+    meta_cols[3].metric("Historical vol", f"{context['historical_vol']:.2%}")
+
+    display_cols = [
+        "contractSymbol",
+        "strike",
+        "bid",
+        "ask",
+        "lastPrice",
+        "midPrice",
+        "impliedVolatility",
+        "volume",
+        "openInterest",
+    ]
+    st.write(f"{active_ticker} nearby option contracts")
+    st.dataframe(context["chain_table"][display_cols].head(25), use_container_width=True)
+
+
+def _render_greek_letters(context, analytics):
+    st.subheader("Greek Letters")
+    greeks = analytics["greeks"]
+    metric_cols = st.columns(5)
+    metric_cols[0].metric("Delta", f"{greeks['delta']:.4f}")
+    metric_cols[1].metric("Gamma", f"{greeks['gamma']:.4f}")
+    metric_cols[2].metric("Theta/day", f"{greeks['theta_per_day']:.4f}")
+    metric_cols[3].metric("Vega", f"{greeks['vega']:.4f}")
+    metric_cols[4].metric("Rho", f"{greeks['rho']:.4f}")
+    if "model_price" in greeks:
+        st.caption(f"CRR American model price using model IV: {greeks['model_price']:.4f}")
+
+    st.subheader("IV Smile and VIX/SVIX")
+    try:
+        indicator_result = VIX_SVIX_MODULE.VIX_SVIX(
+            St=context["spot"],
+            r=risk_free_rate,
+            T=analytics["T"],
+            K_list=context["matched_chain"]["strike"].tolist(),
+            call_price_list=context["matched_chain"]["call_mid"].tolist(),
+            put_price_list=context["matched_chain"]["put_mid"].tolist(),
+        )
+        comparison_cols = st.columns(4)
+        comparison_cols[0].metric("Selected model IV", f"{analytics['model_iv']:.2%}")
+        comparison_cols[1].metric("VIX", f"{indicator_result['VIX']['vix']:.2f}")
+        comparison_cols[2].metric("SVIX", f"{indicator_result['SVIX']['svix']:.2f}")
+        comparison_cols[3].metric("VIX - SVIX", f"{indicator_result['VIX']['vix'] - indicator_result['SVIX']['svix']:.2f}")
+    except Exception as exc:
+        st.warning(f"Could not calculate VIX/SVIX from this option chain: {exc}")
+
+    try:
+        chain_table = context["chain_table"]
+        smile_x, smile_iv = IV_smile_arrays(
+            S=context["spot"],
+            K_list=chain_table["strike"].astype(float).tolist(),
+            r=risk_free_rate,
+            q=dividend_yield,
+            T=analytics["T"],
+            market_price_list=chain_table["midPrice"].astype(float).tolist(),
+            option_kind=option_kind,
+            skip_errors=True,
+        )
+        forward = estimate_forward_price(context["matched_chain"], risk_free_rate, analytics["T"])["F"]
+        svi = fit_svi_smile(smile_x, smile_iv, forward, analytics["T"])
+        fig, ax = plt.subplots()
+        ax.scatter(smile_x, smile_iv * 100, label="Market IV", s=18)
+        ax.plot(svi["smooth_strikes"], svi["smooth_iv"] * 100, label="SVI fit", linewidth=2)
+        ax.axvline(context["spot"], color="gray", linestyle="--", linewidth=1)
+        ax.set_xlabel("Strike")
+        ax.set_ylabel("Implied volatility (%)")
+        ax.set_title("IV Smile")
+        ax.legend()
+        st.pyplot(fig)
+    except Exception as exc:
+        st.warning(f"Could not build SVI IV smile for this option chain: {exc}")
+
+
+def _build_strategy_legs(strategy, selected, chain, other_strike):
+    if strategy == "Custom":
+        custom_text = st.text_area(
+            "CSV columns: option_kind,side,strike,premium,quantity",
+            value="call,long,100,5,1\nput,long,95,4,1",
+        )
+        custom_rows = [line.split(",") for line in custom_text.splitlines() if line.strip()]
+        return [
+            {
+                "option_kind": row[0].strip(),
+                "side": row[1].strip(),
+                "strike": float(row[2]),
+                "premium": float(row[3]),
+                "quantity": int(row[4]),
+            }
+            for row in custom_rows
+        ]
+
+    return build_chain_strategy_legs(
+        strategy,
+        selected,
+        chain["calls"],
+        chain["puts"],
+        other_strike=other_strike,
+    )
+
+
+def _render_backtest(context, analytics, holding_days):
+    st.subheader("Backtest")
+    strategy = st.selectbox(
+        "Strategy",
+        [
+            "Single Option",
+            "Long Straddle",
+            "Short Straddle",
+            "Long Strangle",
+            "Short Strangle",
+            "Long Call Butterfly",
+            "Short Call Butterfly",
+            "Long Put Butterfly",
+            "Short Put Butterfly",
+            "Custom",
+        ],
+    )
+    if "Butterfly" in strategy:
+        other_strike = st.number_input("Butterfly wing width", value=max(float(analytics["selected"]["strike"]) * 0.05, 1.0))
+    elif "Strangle" in strategy:
+        other_strike = st.number_input("Second strike for strangle", value=float(analytics["selected"]["strike"]) * 1.05)
+    else:
+        other_strike = None
+
+    legs = _build_strategy_legs(strategy, analytics["selected"], context["chain"], other_strike)
+    st.dataframe(pd.DataFrame(legs), use_container_width=True)
+
+    grid = payoff_grid(context["spot"], legs)
+    backtest = rolling_strategy_backtest(context["history"], context["spot"], legs, holding_days=int(holding_days))
+    margin = estimate_strategy_margin(legs, context["spot"])
+    metrics = backtest_metrics(backtest, margin)
+
+    summary_cols = st.columns(5)
+    summary_cols[0].metric("Avg PnL", f"{metrics['avg_pnl']:.2f}")
+    summary_cols[1].metric("Win rate", f"{metrics['win_rate']:.2%}")
+    summary_cols[2].metric("Sharpe ratio", f"{metrics['sharpe_ratio']:.2f}")
+    summary_cols[3].metric("MDD", f"{metrics['mdd']:.2f}")
+    summary_cols[4].metric("Margin est.", f"{metrics['margin_estimate']:.2f}")
+
+    plot_left, plot_right = st.columns(2)
+    with plot_left:
+        fig, ax = plt.subplots()
+        ax.plot(grid["stock_price"], grid["strategy_profit"])
+        ax.axhline(0, color="black", linewidth=1)
+        ax.axvline(context["spot"], color="gray", linestyle="--", linewidth=1)
+        ax.set_xlabel("Stock price at expiration")
+        ax.set_ylabel("Profit")
+        ax.set_title("Strategy payoff")
+        st.pyplot(fig)
+
+    with plot_right:
+        fig, ax = plt.subplots()
+        backtest_plot = backtest.copy()
+        backtest_plot["cumulative_pnl"] = backtest_plot["strategy_profit"].cumsum()
+        ax.plot(backtest_plot.index, backtest_plot["strategy_profit"], label="Period PnL", linewidth=1)
+        ax.plot(backtest_plot.index, backtest_plot["cumulative_pnl"], label="Cumulative PnL", linewidth=2)
+        ax.axhline(0, color="black", linewidth=1)
+        ax.set_xlabel("Exit date")
+        ax.set_ylabel("PnL")
+        ax.set_title("Rolling backtest PnL")
+        ax.legend()
+        st.pyplot(fig)
+
+    st.dataframe(backtest_plot.tail(30), use_container_width=True)
+
+
+def _render_risk_management(context, analytics):
+    st.subheader("Risk Management")
+    selected = analytics["selected"]
+    risk_legs = [
+        OptionLeg(option_kind=option_kind, strike=float(selected["strike"]), quantity=1),
+    ]
+    matrix = build_risk_matrix(
+        risk_legs,
+        spot=context["spot"],
+        risk_free_rate=risk_free_rate,
+        dividend_yield=dividend_yield,
+        volatility=analytics["model_iv"],
+        time_to_maturity=analytics["T"],
+    )
+    st.pyplot(plot_risk_matrix(matrix, title="Selected Contract P&L and Greeks Risk Matrix"))
+
+    returns = context["history"]["Close"].pct_change().dropna()
+    var_summary = historical_var_es_summary(returns, confidence_level=0.95, portfolio_value=context["spot"])
+    risk_cols = st.columns(3)
+    risk_cols[0].metric("Historical VaR 95%", f"{var_summary['var']:.2f}")
+    risk_cols[1].metric("Expected Shortfall 95%", f"{var_summary['expected_shortfall']:.2f}")
+    risk_cols[2].metric("Tail observations", var_summary["tail_observations"])
+
+    st.subheader("Vol Curve Monitor")
+    curves = build_demo_vol_curves()
+    st.pyplot(plot_vol_curve_monitor(curves, expiry="2026-07-17", forward=100))
+    st.caption("The vol-curve monitor uses demo curve data here. Replace this DataFrame with saved/live IV nodes for production use.")
+
+
+st.set_page_config(page_title="Option Analysis System", layout="wide")
+st.title("Option Analysis System")
+
+with st.sidebar:
+    page = st.selectbox(
+        "Menu",
+        ["Contract Quote", "Backtest", "Greek Letters", "Risk Management"],
+    )
+    ticker = st.text_input("Ticker", value="AAPL").upper().strip()
+    option_style = st.selectbox("Exercise style", ["European", "American"])
+    option_kind = st.radio("Option type", ["call", "put"], horizontal=True)
+    risk_free_rate = st.number_input("Risk-free rate", value=0.04, step=0.005, format="%.4f")
+    dividend_yield = st.number_input("Dividend yield", value=0.00, step=0.005, format="%.4f")
+    holding_days = st.number_input("Backtest holding days", value=20, min_value=1, max_value=252)
+    st.caption(f"American pricing uses CRR steps fixed at n = {CRR_STEPS}")
+    st.divider()
+    max_spread_pct = st.slider("Max bid/ask spread", 0.05, 2.00, 0.50, 0.05)
+    min_open_interest = st.number_input("Min open interest", value=0, min_value=0, step=10)
+    min_volume = st.number_input("Min volume", value=0, min_value=0, step=10)
+    require_bid_ask = st.checkbox("Require bid/ask quotes", value=False)
+
+if not ticker:
+    st.stop()
+
+try:
+    preview_chain = _cached_option_chain(ticker)
+    expiration = st.selectbox("Expiration", preview_chain["expirations"])
+    context = _load_market_context(
+        ticker,
+        expiration,
+        option_kind,
+        max_spread_pct,
+        min_open_interest,
+        min_volume,
+        require_bid_ask,
+    )
+except Exception as exc:
+    st.error(str(exc))
+    st.stop()
+
+contracts = context["chain_table"]["contractSymbol"].tolist()
+if not contracts:
+    st.error("No valid contracts are available after filtering.")
+    st.stop()
+
+selected_symbol = st.selectbox("Contract", contracts)
+analytics = _selected_contract_analytics(
+    context,
+    selected_symbol,
+    option_kind,
+    option_style,
+    risk_free_rate,
+    dividend_yield,
+)
+
+if page == "Contract Quote":
+    _render_contract_quote(context, analytics, ticker, option_style)
+elif page == "Backtest":
+    _render_backtest(context, analytics, holding_days)
+elif page == "Greek Letters":
+    _render_greek_letters(context, analytics)
+else:
+    _render_risk_management(context, analytics)

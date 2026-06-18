@@ -1,0 +1,23 @@
+import yfinance as yf
+import numpy as np
+import pandas as pd
+import scipy
+
+def data_from_yfinace(ticker,period = "1d",interval = "1d", start = None ,end = None,auto_adjust = True):
+    data = yf.download(
+        tickers = ticker,
+        period = period,
+        interval = interval,
+        start = start,
+        end = end,
+        auto_adjust = auto_adjust,
+        progress = False,
+        multi_level_index = False
+    )
+    data = data.dropna(how = "all")
+    return data 
+
+ticker =  "MU"
+
+mu = data_from_yfinace(ticker,period = "5d",interval = "1d", start = None ,end = None,auto_adjust = True)
+print(mu)

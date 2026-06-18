@@ -1,0 +1,128 @@
+import math
+import numpy as np
+
+
+def _simulate_terminal_prices(S, r, q, sigma, T, num_simulations, num_repetitions, seed=None):
+    rng = np.random.default_rng(seed)
+    Z = rng.standard_normal((num_repetitions, num_simulations))
+    ST = S * np.exp((r - q - 0.5 * sigma**2) * T + sigma * math.sqrt(T) * Z)
+    return ST, Z
+
+
+def _average_batches(values):
+    batch_means = np.mean(values, axis=1)
+    estimate = np.mean(batch_means)
+    standard_error = np.std(batch_means, ddof=1) if len(batch_means) > 1 else 0.0
+    return estimate, standard_error
+
+
+def pathwise(S,K,r,q,sigma,T,num_simulations=100000,num_repetitions=20,h=None,seed=None,option_type="European"):
+    if option_type != "European":
+        raise ValueError("Pathwise Monte Carlo Greeks here support European options only.")
+
+    if h is None:
+        h = S * 1e-4
+
+    ST, Z = _simulate_terminal_prices( S, r, q, sigma, T, num_simulations, num_repetitions, seed)
+    discount = math.exp(-r * T)
+    sqrt_T = math.sqrt(T)
+
+    call_indicator = (ST > K).astype(float)
+    put_indicator = (ST < K).astype(float)
+    call_payoff = np.maximum(ST - K, 0)
+    put_payoff = np.maximum(K - ST, 0)
+
+    dST_dS = ST / S
+    dST_dsigma = ST * (-sigma * T + sqrt_T * Z)
+    dST_dr = T * ST
+    dST_dT = ST * ((r - q - 0.5 * sigma**2) + sigma * Z / (2 * sqrt_T))
+
+    call_delta = discount * call_indicator * dST_dS
+    put_delta = -discount * put_indicator * dST_dS
+
+    call_vega = discount * call_indicator * dST_dsigma
+    put_vega = -discount * put_indicator * dST_dsigma
+
+    call_rho = discount * (call_indicator * dST_dr - T * call_payoff)
+    put_rho = discount * (-put_indicator * dST_dr - T * put_payoff)
+
+    # Theta is defined as time decay: theta = -d(option value) / dT.
+    call_theta = discount * (r * call_payoff - call_indicator * dST_dT)
+    put_theta = discount * (r * put_payoff + put_indicator * dST_dT)
+
+    # The vanilla payoff is not twice differentiable at K, so pathwise gamma
+    # uses a common-random-number finite difference around the same simulated Z.
+    ST_up = (S + h) * np.exp((r - q - 0.5 * sigma**2) * T + sigma * sqrt_T * Z)
+    ST_down = (S - h) * np.exp((r - q - 0.5 * sigma**2) * T + sigma * sqrt_T * Z)
+    call_up = np.maximum(ST_up - K, 0)
+    call_down = np.maximum(ST_down - K, 0)
+    put_up = np.maximum(K - ST_up, 0)
+    put_down = np.maximum(K - ST_down, 0)
+
+    call_gamma = discount * (call_up - 2 * call_payoff + call_down) / h**2
+    put_gamma = discount * (put_up - 2 * put_payoff + put_down) / h**2
+
+    return {
+        "call": {
+            "delta": _average_batches(call_delta),
+            "gamma": _average_batches(call_gamma),
+            "vega": _average_batches(call_vega),
+            "rho": _average_batches(call_rho),
+            "theta": _average_batches(call_theta),
+        },
+        "put": {
+            "delta": _average_batches(put_delta),
+            "gamma": _average_batches(put_gamma),
+            "vega": _average_batches(put_vega),
+            "rho": _average_batches(put_rho),
+            "theta": _average_batches(put_theta),
+        },
+    }
+
+
+def likelihood(S,K,r,q,sigma,T,num_simulations=100000,num_repetitions=20,seed=None ,option_type="European"):
+    if option_type != "European":
+        raise ValueError("Likelihood Monte Carlo Greeks here support European options only.")
+
+    ST, Z = _simulate_terminal_prices(
+        S, r, q, sigma, T, num_simulations, num_repetitions, seed
+    )
+    discount = math.exp(-r * T)
+    variance_time = sigma**2 * T
+    log_error = np.log(ST / S) - (r - q - 0.5 * sigma**2) * T
+
+    call_payoff = np.maximum(ST - K, 0)
+    put_payoff = np.maximum(K - ST, 0)
+    call_pv = discount * call_payoff
+    put_pv = discount * put_payoff
+
+    score_S = log_error / (variance_time * S)
+    score_S_derivative = -(log_error + 1) / (variance_time * S**2)
+    gamma_weight = score_S**2 + score_S_derivative
+
+    score_sigma = (Z**2 - 1) / sigma - math.sqrt(T) * Z
+    score_r = log_error / sigma**2
+
+    a = r - q - 0.5 * sigma**2
+    score_T = (
+        a * log_error / variance_time
+        + log_error**2 / (2 * sigma**2 * T**2)
+        - 1 / (2 * T)
+    )
+
+    return {
+        "call": {
+            "delta": _average_batches(call_pv * score_S),
+            "gamma": _average_batches(call_pv * gamma_weight),
+            "vega": _average_batches(call_pv * score_sigma),
+            "rho": _average_batches(call_pv * (score_r - T)),
+            "theta": _average_batches(call_pv * (r - score_T)),
+        },
+        "put": {
+            "delta": _average_batches(put_pv * score_S),
+            "gamma": _average_batches(put_pv * gamma_weight),
+            "vega": _average_batches(put_pv * score_sigma),
+            "rho": _average_batches(put_pv * (score_r - T)),
+            "theta": _average_batches(put_pv * (r - score_T)),
+        },
+    }

@@ -1,0 +1,177 @@
+import math
+
+
+def estimate_forward_price_from_put_call_parity(r, T, K_list, call_price_list, put_price_list):
+    if T <= 0:
+        raise ValueError("T must be positive.")
+
+    option_data = sorted(zip(K_list, call_price_list, put_price_list))
+    valid_rows = []
+    for K, call_price, put_price in option_data:
+        K = float(K)
+        call_price = float(call_price)
+        put_price = float(put_price)
+        if K > 0 and call_price > 0 and put_price > 0:
+            valid_rows.append((K, call_price, put_price))
+
+    if not valid_rows:
+        raise ValueError("At least one valid matched call/put price is required to estimate F.")
+
+    reference_K, reference_call, reference_put = min(
+        valid_rows,
+        key=lambda row: (abs(row[1] - row[2]), row[0]),
+    )
+    F = reference_K + math.exp(r * T) * (reference_call - reference_put)
+    if not math.isfinite(F) or F <= 0:
+        raise ValueError("Estimated F must be positive. Check option prices.")
+
+    return {
+        "F": F,
+        "reference_strike": reference_K,
+        "call_price": reference_call,
+        "put_price": reference_put,
+        "call_put_diff": reference_call - reference_put,
+    }
+
+
+# VIX
+def VIX(r, T_minus_t, K_list, F, call_price_list, put_price_list):
+    if T_minus_t <= 0:
+        raise ValueError("T_minus_t must be positive.")
+
+    option_data = sorted(zip(K_list, call_price_list, put_price_list))
+    K_list = [row[0] for row in option_data]
+    call_price_list = [row[1] for row in option_data]
+    put_price_list = [row[2] for row in option_data]
+
+    K0 = max([K for K in K_list if K <= F])
+
+    summation = 0
+
+    for i in range(len(K_list)):
+        K = K_list[i]
+
+        if i == 0:
+            delta_K = K_list[i + 1] - K_list[i]
+        elif i == len(K_list) - 1:
+            delta_K = K_list[i] - K_list[i - 1]
+        else:
+            delta_K = (K_list[i + 1] - K_list[i - 1]) / 2
+
+        if K < K0:
+            Q_K = put_price_list[i]
+        elif K > K0:
+            Q_K = call_price_list[i]
+        else:
+            Q_K = (call_price_list[i] + put_price_list[i]) / 2
+
+        summation += delta_K / (K**2) * math.exp(r * T_minus_t) * Q_K
+
+    sigma_square = 2 / T_minus_t * summation
+    sigma_square -= 1 / T_minus_t * ((F / K0) - 1) ** 2
+
+    if sigma_square < 0:
+        raise ValueError("VIX variance is negative. Check option prices and F.")
+
+    vix = math.sqrt(sigma_square) * 100
+
+    return {
+        "variance": sigma_square,
+        "vix": vix,
+        "K0": K0,
+        "F": F,
+    }
+
+
+# SVIX
+def SVIX(St, r, T, K_list, F, call_price_list, put_price_list):
+    if T <= 0:
+        raise ValueError("T must be positive.")
+    if St <= 0:
+        raise ValueError("St must be positive.")
+
+    option_data = sorted(zip(K_list, call_price_list, put_price_list))
+    K_list = [row[0] for row in option_data]
+    call_price_list = [row[1] for row in option_data]
+    put_price_list = [row[2] for row in option_data]
+
+    K0 = max([K for K in K_list if K <= F])
+
+    summation = 0
+
+    for i in range(len(K_list)):
+        K = K_list[i]
+
+        if i == 0:
+            delta_K = K_list[i + 1] - K_list[i]
+        elif i == len(K_list) - 1:
+            delta_K = K_list[i] - K_list[i - 1]
+        else:
+            delta_K = (K_list[i + 1] - K_list[i - 1]) / 2
+
+        if K < K0:
+            Q_K = put_price_list[i]
+        elif K > K0:
+            Q_K = call_price_list[i]
+        else:
+            Q_K = (call_price_list[i] + put_price_list[i]) / 2
+
+        summation += delta_K * Q_K
+
+    Rf = math.exp(r * T)
+    svix_square = 2 / (T * Rf * St**2) * summation
+
+    if svix_square < 0:
+        raise ValueError("SVIX variance is negative. Check option prices and F.")
+
+    svix = math.sqrt(svix_square) * 100
+
+    return {
+        "variance": svix_square,
+        "svix": svix,
+        "K0": K0,
+        "F": F,
+    }
+
+
+def VIX_SVIX(St, r, T, K_list, call_price_list, put_price_list, F=None):
+    if F is None:
+        forward = estimate_forward_price_from_put_call_parity(
+            r,
+            T,
+            K_list,
+            call_price_list,
+            put_price_list,
+        )
+        F = forward["F"]
+    else:
+        forward = {
+            "F": F,
+            "reference_strike": None,
+            "call_price": None,
+            "put_price": None,
+            "call_put_diff": None,
+        }
+
+    return {
+        "VIX": VIX(r, T, K_list, F, call_price_list, put_price_list),
+        "SVIX": SVIX(St, r, T, K_list, F, call_price_list, put_price_list),
+        "forward": forward,
+    }
+
+
+if __name__ == "__main__":
+    K_list = [90, 95, 100, 105, 110]
+    call_price_list = [12.0, 8.0, 5.0, 2.8, 1.4]
+    put_price_list = [1.2, 2.5, 4.8, 7.6, 11.0]
+
+    result = VIX_SVIX(
+        St=100,
+        r=0.04,
+        T=30 / 365,
+        K_list=K_list,
+        call_price_list=call_price_list,
+        put_price_list=put_price_list,
+    )
+
+    print(result)

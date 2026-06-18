@@ -1,0 +1,15 @@
+from importlib.machinery import SourceFileLoader
+import importlib.util
+from pathlib import Path
+
+
+module_path = Path(__file__).resolve().with_name("vix_svix")
+loader = SourceFileLoader("vix_svix_compat_module", str(module_path))
+spec = importlib.util.spec_from_loader("vix_svix_compat_module", loader)
+module = importlib.util.module_from_spec(spec)
+loader.exec_module(module)
+
+estimate_forward_price_from_put_call_parity = module.estimate_forward_price_from_put_call_parity
+VIX = module.VIX
+SVIX = module.SVIX
+VIX_SVIX = module.VIX_SVIX
