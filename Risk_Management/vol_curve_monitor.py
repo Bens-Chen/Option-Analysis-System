@@ -46,18 +46,29 @@ def plot_vol_curve_monitor(curves, expiry=None, forward=None):
         constrained_layout=True,
     )
 
-    ax_curve.plot(fine_strikes, fine_iv * 100, color="#8d99ae", linewidth=2)
-    ax_curve.scatter(strikes, iv * 100, color="#5c677d", zorder=3)
+    ax_curve.plot(fine_strikes, fine_iv * 100, color="#8d99ae", linewidth=2, label="Smoothed IV")
+    ax_curve.scatter(strikes, iv * 100, color="#5c677d", zorder=3, label="Market IV nodes")
     ax_curve.axvline(forward, color="#7f3b2e", linestyle="--", linewidth=1.5, label="Forward")
     ax_curve.set_title(f"Spline Curvature - {expiry}")
     ax_curve.set_xlabel("Strike")
     ax_curve.set_ylabel("Implied volatility (%)")
     ax_curve.grid(True, alpha=0.3)
-    ax_curve.legend(loc="best")
 
     ax_curvature = ax_curve.twinx()
-    ax_curvature.plot(fine_strikes, curvature, color="#2a9d8f", alpha=0.45, linewidth=1.5)
+    ax_curvature.plot(fine_strikes, curvature, color="#2a9d8f", alpha=0.45, linewidth=1.5, label="Curvature")
     ax_curvature.set_ylabel("Curvature")
+    curve_handles, curve_labels = ax_curve.get_legend_handles_labels()
+    curvature_handles, curvature_labels = ax_curvature.get_legend_handles_labels()
+    ax_curve.legend(curve_handles + curvature_handles, curve_labels + curvature_labels, loc="best")
+    ax_curve.text(
+        0.01,
+        0.02,
+        "Smoothed IV: fitted curve through observed nodes. Curvature: local smile bend; spikes often mean noisy or sparse strikes.",
+        transform=ax_curve.transAxes,
+        fontsize=8,
+        color="#3d405b",
+        bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "alpha": 0.78, "edgecolor": "#d6d6d6"},
+    )
 
     for name, group in curves.groupby("expiry"):
         group = group.sort_values("strike")

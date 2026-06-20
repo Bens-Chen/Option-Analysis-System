@@ -428,17 +428,17 @@ def _render_backtest(
     )
 
     summary_cols = st.columns(6)
-    summary_cols[0].metric("Avg PnL", f"{metrics['avg_pnl']:.2f}")
-    summary_cols[1].metric("Total PnL", f"{metrics['total_pnl']:.2f}")
-    summary_cols[2].metric("Win rate", f"{metrics['win_rate']:.2%}")
-    summary_cols[3].metric("Sharpe", _format_metric(metrics["sharpe_ratio"]))
-    summary_cols[4].metric("MDD", f"{metrics['mdd']:.2f}", f"{metrics['mdd_pct']:.2%}")
-    summary_cols[5].metric("Return on capital", f"{metrics['return_on_capital']:.2%}")
+    summary_cols[0].metric("Avg PnL", f"{metrics['avg_pnl']:.2f}", f"{metrics['avg_pnl'] / initial_capital:.2%} of capital")
+    summary_cols[1].metric("Total PnL", f"{metrics['total_pnl']:.2f}", f"{metrics['return_on_capital']:.2%} of capital")
+    summary_cols[2].metric("Win rate", f"{metrics['win_rate']:.2%}", f"{metrics['win_rate'] - 0.50:+.2%} vs 50%")
+    summary_cols[3].metric("Sharpe", _format_metric(metrics["sharpe_ratio"]), "annualized")
+    summary_cols[4].metric("MDD", f"{metrics['mdd']:.2f}", f"{metrics['mdd_pct']:.2%} of capital")
+    summary_cols[5].metric("Return on capital", f"{metrics['return_on_capital']:.2%}", f"{metrics['total_pnl']:.2f} PnL")
     risk_cols = st.columns(4)
-    risk_cols[0].metric("Ending equity", f"{metrics['ending_equity']:.2f}")
-    risk_cols[1].metric("Margin est.", f"{metrics['margin_estimate']:.2f}")
-    risk_cols[2].metric("VaR 95%", f"{metrics['var_95']:.2%}")
-    risk_cols[3].metric("ES 95%", f"{metrics['expected_shortfall_95']:.2%}")
+    risk_cols[0].metric("Ending equity", f"{metrics['ending_equity']:.2f}", f"{metrics['ending_equity'] - initial_capital:.2f} vs initial")
+    risk_cols[1].metric("Margin est.", f"{metrics['margin_estimate']:.2f}", f"{metrics['margin_estimate'] / initial_capital:.2%} of capital")
+    risk_cols[2].metric("VaR 95%", f"{metrics['var_95_amount']:.2f}", f"{metrics['var_95']:.2%} of capital")
+    risk_cols[3].metric("ES 95%", f"{metrics['expected_shortfall_95_amount']:.2f}", f"{metrics['expected_shortfall_95']:.2%} of capital")
 
     plot_left, plot_right = st.columns(2)
     with plot_left:
@@ -512,8 +512,9 @@ def _historical_price_shocks(history, holding_days):
     returns = close.pct_change(int(holding_days)).dropna()
     if len(returns) < 20:
         return [-0.20, -0.10, -0.05, 0.0, 0.05, 0.10, 0.20]
-    quantiles = returns.quantile([0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99])
-    shocks = sorted({round(float(value), 4) for value in quantiles if pd.notna(value)} | {0.0})
+    magnitudes = returns.abs().quantile([0.25, 0.50, 0.75, 0.90, 0.95]).dropna()
+    shock_sizes = sorted({round(float(value), 4) for value in magnitudes if value > 0})
+    shocks = sorted({0.0} | {-value for value in shock_sizes} | set(shock_sizes))
     return shocks
 
 
@@ -550,6 +551,9 @@ def _render_risk_management(context, analytics):
     curves = _live_vol_curve_nodes(context)
     if len(curves) >= 4:
         st.pyplot(plot_vol_curve_monitor(curves, expiry=context["expiration"], forward=context["spot"]))
+        st.caption(
+            "Smoothed IV shows the fitted smile across strikes; Curvature highlights where the smile bends sharply, which can indicate skew concentration, sparse quotes, or noisy IV nodes."
+        )
     else:
         st.info("Not enough live OTM IV nodes from the current yfinance chain to draw a curve monitor.")
 

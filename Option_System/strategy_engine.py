@@ -431,6 +431,8 @@ def backtest_metrics(backtest, margin, initial_capital=100000, holding_days=1, t
         "return_on_capital": float(profit.sum() / initial_capital),
         "var_95": var_95,
         "expected_shortfall_95": expected_shortfall_95,
+        "var_95_amount": float(var_95 * initial_capital),
+        "expected_shortfall_95_amount": float(expected_shortfall_95 * initial_capital),
         "ending_equity": float(equity.iloc[-1]),
         "initial_capital": float(initial_capital),
     }

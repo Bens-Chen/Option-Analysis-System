@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from Option_System.analytics import black_scholes_greeks, option_price_from_bs
-from .utils import color_table_by_sign, format_number
+from .utils import color_risk_matrix_table, format_number
 
 
 @dataclass(frozen=True)
@@ -61,9 +61,16 @@ def plot_risk_matrix(risk_matrix, title="P&L with base price shocks"):
 
     table_rows = ["pnl", "delta", "gamma", "theta", "vega", "rho"]
     labels = [f"p:{shock:+.0%}" for shock in risk_matrix["shock"]]
-    table_values = [
-        [format_number(value) for value in risk_matrix[row].to_numpy()] for row in table_rows
-    ]
+    table_values = []
+    table_numeric_values = []
+    for row in table_rows:
+        values = risk_matrix[row].to_numpy(dtype=float)
+        if row == "pnl":
+            table_values.append([format_number(value) for value in values])
+            table_numeric_values.append(values)
+        else:
+            table_values.append([f"{value:.2f}%" for value in values])
+            table_numeric_values.append(values)
 
     fig, (ax_line, ax_table) = plt.subplots(
         2,
@@ -98,7 +105,7 @@ def plot_risk_matrix(risk_matrix, title="P&L with base price shocks"):
     table.auto_set_font_size(False)
     table.set_fontsize(9)
     table.scale(1, 1.3)
-    color_table_by_sign(table, risk_matrix[table_rows].to_numpy().T)
+    color_risk_matrix_table(table, table_rows, pd.DataFrame(table_numeric_values).to_numpy())
 
     return fig
 

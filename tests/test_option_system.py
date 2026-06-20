@@ -106,7 +106,8 @@ def test_backtest_metrics_uses_initial_capital_returns():
 
     assert metrics["return_on_capital"] == pytest.approx(0.02)
     assert metrics["ending_equity"] == pytest.approx(10200)
-    assert {"mdd_pct", "var_95", "expected_shortfall_95"} <= set(metrics)
+    assert {"mdd_pct", "var_95", "expected_shortfall_95", "var_95_amount", "expected_shortfall_95_amount"} <= set(metrics)
+    assert metrics["var_95_amount"] == pytest.approx(metrics["var_95"] * 10000)
 
 
 def test_crr_greeks_supports_american_option_style():
