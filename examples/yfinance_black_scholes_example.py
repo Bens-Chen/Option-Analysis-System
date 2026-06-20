@@ -1,5 +1,3 @@
-"""Example script that prices a yfinance option input with Black-Scholes."""
-
 from Market_Data.yfinance_data import build_option_inputs
 from Methods.black_scholes import BS
 

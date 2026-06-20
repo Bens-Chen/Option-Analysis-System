@@ -1,5 +1,3 @@
-"""Piecewise interval-position payoff helper."""
-
 def interval_position(stock_price,lower_bound,upper_bound,lower_shares,upper_shares):
     if stock_price <= lower_bound:
         return float(lower_shares)

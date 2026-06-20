@@ -1,5 +1,3 @@
-"""Monte Carlo option pricing helpers for simulated terminal payoffs."""
-
 import numpy as np
 
 def Monte_Carlo(S, r, q, sigma, T, K, num_simulations, num_repetitions):

@@ -1,5 +1,3 @@
-"""IV smile construction and SVI calibration utilities."""
-
 import math
 import sys
 from pathlib import Path

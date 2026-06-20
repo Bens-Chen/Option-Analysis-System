@@ -1,5 +1,3 @@
-"""Finite-difference option pricing grids for PDE-based valuation."""
-
 import numpy as np
 
 def finite_diiference_implicit(S0, K, r, q, sigma, T, Smin, Smax, m, n, option_type="european"):

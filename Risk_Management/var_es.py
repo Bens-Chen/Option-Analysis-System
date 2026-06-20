@@ -1,5 +1,3 @@
-"""Historical and EWMA VaR/Expected Shortfall estimators."""
-
 import numpy as np
 
 

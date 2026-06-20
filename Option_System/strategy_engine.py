@@ -1,15 +1,12 @@
-"""Strategy leg builders, payoff calculations, and scenario backtest utilities."""
-
 import numpy as np
 import pandas as pd
 
+from Option_System.analytics import option_price_from_bs
 from Trading_Strategies.straddle import long_straddle_profit, short_straddle_profit
 from Trading_Strategies.strangle import long_strangle_profit, short_strangle_profit
 
 
 def option_leg_profit(stock_prices, option_kind, side, strike, premium, quantity=1):
-    """Calculate one option leg's terminal profit over one or more stock prices."""
-
     prices = np.asarray(stock_prices, dtype=float)
     if option_kind == "call":
         payoff = np.maximum(prices - strike, 0.0)
@@ -24,8 +21,6 @@ def option_leg_profit(stock_prices, option_kind, side, strike, premium, quantity
 
 
 def strategy_profit(stock_prices, legs):
-    """Sum all option-leg profits into a full strategy payoff."""
-
     prices = np.asarray(stock_prices, dtype=float)
     total = np.zeros_like(prices, dtype=float)
     for leg in legs:
@@ -41,8 +36,6 @@ def strategy_profit(stock_prices, legs):
 
 
 def build_strategy_legs(strategy_name, spot, chain_row, other_strike=None, other_premium=None):
-    """Build simple strategy legs from one selected quote row."""
-
     strike = float(chain_row["strike"])
     premium = _market_premium(chain_row)
     option_kind = chain_row["option_kind"]
@@ -86,8 +79,6 @@ def build_strategy_legs(strategy_name, spot, chain_row, other_strike=None, other
 
 
 def _option_leg_from_row(row, option_kind, side, quantity=1):
-    """Normalize a yfinance option-chain row into the internal leg format."""
-
     return {
         "option_kind": option_kind,
         "side": side,
@@ -101,8 +92,6 @@ def _option_leg_from_row(row, option_kind, side, quantity=1):
 
 
 def build_chain_strategy_legs(strategy_name, selected_row, calls, puts, other_strike=None, ratio_quantity=2):
-    """Build single-leg, spread, butterfly, strangle, and condor structures."""
-
     strike = float(selected_row["strike"])
     selected_kind = selected_row["option_kind"]
 
@@ -215,8 +204,6 @@ def build_chain_strategy_legs(strategy_name, selected_row, calls, puts, other_st
 
 
 def _butterfly_outer_targets(calls, middle_strike, requested_width=None):
-    """Choose lower and upper strikes around the butterfly body strike."""
-
     strikes = sorted(float(strike) for strike in calls["strike"].dropna().unique())
     lower_strikes = [strike for strike in strikes if strike < middle_strike]
     upper_strikes = [strike for strike in strikes if strike > middle_strike]
@@ -233,8 +220,6 @@ def _butterfly_outer_targets(calls, middle_strike, requested_width=None):
 
 
 def _spread_width(chain, anchor_strike, requested_width=None):
-    """Pick the requested spread width or infer the nearest available spacing."""
-
     strikes = sorted(float(strike) for strike in chain["strike"].dropna().unique())
     if len(strikes) < 2:
         raise ValueError("Spread strategies need at least two available strikes.")
@@ -247,24 +232,18 @@ def _spread_width(chain, anchor_strike, requested_width=None):
 
 
 def _validate_ordered_strikes(rows, message):
-    """Reject spread structures when quote data cannot provide ordered strikes."""
-
     strikes = [float(row["strike"]) for row in rows]
     if any(left >= right for left, right in zip(strikes, strikes[1:])):
         raise ValueError(message)
 
 
 def _nearest_strike_row(chain, strike):
-    """Find the option-chain row closest to a target strike."""
-
     ordered = chain.copy()
     ordered["distance_from_target"] = (ordered["strike"].astype(float) - strike).abs()
     return ordered.sort_values("distance_from_target").iloc[0].to_dict()
 
 
 def _market_premium(row):
-    """Use mid price when possible and fall back to last traded price."""
-
     bid = float(row.get("bid", 0) or 0)
     ask = float(row.get("ask", 0) or 0)
     last = float(row.get("lastPrice", 0) or 0)
@@ -274,8 +253,6 @@ def _market_premium(row):
 
 
 def _quote_value(row, column):
-    """Read a positive quote value from a row, returning zero if unavailable."""
-
     try:
         value = float(row.get(column, 0) or 0)
     except (TypeError, ValueError):
@@ -284,8 +261,6 @@ def _quote_value(row, column):
 
 
 def _executable_premium(leg, slippage_per_contract=0.0):
-    """Approximate executable premium using ask for buys and bid for sells."""
-
     side = leg["side"]
     bid = float(leg.get("bid", 0) or 0)
     ask = float(leg.get("ask", 0) or 0)
@@ -301,8 +276,6 @@ def _executable_premium(leg, slippage_per_contract=0.0):
 
 
 def rank_strategy_candidates(spot, historical_volatility, selected_iv, trend_signal):
-    """Rank educational strategy candidates from IV level and trend context."""
-
     iv_ratio = selected_iv / historical_volatility if historical_volatility > 0 else np.nan
     rows = []
 
@@ -330,8 +303,6 @@ def rank_strategy_candidates(spot, historical_volatility, selected_iv, trend_sig
 
 
 def moving_average_trend(price_history, short_window=20, long_window=60):
-    """Classify a simple price trend from short and long moving averages."""
-
     close = price_history["Close"].dropna()
     if len(close) < long_window:
         return "neutral"
@@ -344,24 +315,6 @@ def moving_average_trend(price_history, short_window=20, long_window=60):
     return "neutral"
 
 
-def historical_scenario_backtest(price_history, spot, legs, holding_days=20):
-    """Apply historical holding-period returns to the current strategy payoff."""
-
-    close = price_history["Close"].dropna().astype(float)
-    returns = close.pct_change(holding_days).dropna()
-    terminal_prices = spot * (1 + returns.to_numpy())
-    profit = strategy_profit(terminal_prices, legs)
-
-    return pd.DataFrame(
-        {
-            "historical_return": returns.to_numpy(),
-            "scenario_terminal_price": terminal_prices,
-            "strategy_profit": profit,
-        },
-        index=returns.index,
-    )
-
-
 def rolling_strategy_backtest(
     price_history,
     current_spot,
@@ -371,56 +324,107 @@ def rolling_strategy_backtest(
     slippage_per_contract=0.0,
     transaction_cost_per_contract=0.65,
     contract_multiplier=1,
+    risk_free_rate=0.04,
+    dividend_yield=0.0,
+    time_to_maturity=30 / 365,
+    volatility_window=60,
+    trading_days=252,
 ):
-    """Re-enter the same relative option structure through history.
+    """Run a model rolling backtest from yfinance underlying prices.
 
-    yfinance does not provide historical option chains here, so each leg is
-    scaled by current strike/spot and premium/spot. This keeps the selected
-    DTE rolling through the historical stock path.
+    Each entry date rebuilds the strategy with the same strike/spot ratios as
+    the selected live strategy. Entry and exit option values are estimated with
+    Black-Scholes and a rolling Newey-West realized-volatility proxy because
+    yfinance does not provide historical option chains.
     """
+
     close = price_history["Close"].dropna().astype(float)
     if holding_days < 1:
         raise ValueError("holding_days must be at least 1.")
-    if len(close) <= holding_days:
+    if len(close) <= holding_days + volatility_window:
         raise ValueError("Not enough price history for rolling backtest.")
     if current_spot <= 0:
         raise ValueError("current_spot must be positive.")
     if contract_multiplier <= 0:
         raise ValueError("contract_multiplier must be positive.")
+    if time_to_maturity <= 0:
+        raise ValueError("time_to_maturity must be positive.")
+    if volatility_window < 5:
+        raise ValueError("volatility_window must be at least 5.")
 
     rows = []
     step = holding_days if non_overlapping else 1
     round_trip_cost = 2 * max(float(transaction_cost_per_contract), 0.0)
-    for i in range(0, len(close) - holding_days, step):
+    slippage = max(float(slippage_per_contract), 0.0)
+    log_returns = np.log(close / close.shift(1)).dropna()
+    for i in range(volatility_window, len(close) - holding_days, step):
         entry_date = close.index[i]
         exit_date = close.index[i + holding_days]
         entry_spot = float(close.iloc[i])
-        terminal_price = float(close.iloc[i + holding_days])
+        exit_spot = float(close.iloc[i + holding_days])
+        entry_sigma = _rolling_realized_volatility(log_returns.iloc[i - volatility_window : i], trading_days)
+        exit_sigma = _rolling_realized_volatility(log_returns.iloc[i + holding_days - volatility_window : i + holding_days], trading_days)
+        remaining_time = time_to_maturity - holding_days / 365
 
-        rolling_legs = []
+        rolling_entry_legs = []
+        model_entry_value = 0.0
+        model_exit_value = 0.0
+        gross_profit = 0.0
         for leg in legs:
-            rolling_legs.append(
+            quantity = abs(int(leg.get("quantity", 1)))
+            side = 1 if leg["side"] == "long" else -1
+            strike = entry_spot * float(leg["strike"]) / current_spot
+            entry_value = option_price_from_bs(
+                entry_spot,
+                strike,
+                risk_free_rate,
+                dividend_yield,
+                entry_sigma,
+                time_to_maturity,
+                leg["option_kind"],
+            )
+            if remaining_time > 0:
+                exit_value = option_price_from_bs(
+                    exit_spot,
+                    strike,
+                    risk_free_rate,
+                    dividend_yield,
+                    exit_sigma,
+                    remaining_time,
+                    leg["option_kind"],
+                )
+            else:
+                exit_value = _intrinsic_value(exit_spot, strike, leg["option_kind"])
+
+            model_entry_value += side * entry_value * quantity * contract_multiplier
+            model_exit_value += side * exit_value * quantity * contract_multiplier
+            gross_profit += side * (exit_value - entry_value) * quantity * contract_multiplier
+            gross_profit -= 2 * slippage * quantity * contract_multiplier
+            rolling_entry_legs.append(
                 {
                     "option_kind": leg["option_kind"],
                     "side": leg["side"],
-                    "strike": entry_spot * float(leg["strike"]) / current_spot,
-                    "premium": entry_spot * _executable_premium(leg, slippage_per_contract) / current_spot,
-                    "quantity": int(leg.get("quantity", 1)),
+                    "strike": strike,
+                    "premium": entry_value,
+                    "quantity": quantity,
                 }
             )
 
-        gross_profit = float(strategy_profit([terminal_price], rolling_legs)[0]) * contract_multiplier
-        contracts = sum(abs(int(leg.get("quantity", 1))) for leg in rolling_legs)
+        contracts = sum(abs(int(leg.get("quantity", 1))) for leg in legs)
         transaction_cost = round_trip_cost * contracts
         profit = gross_profit - transaction_cost
-        margin = estimate_strategy_margin(rolling_legs, entry_spot, contract_multiplier=contract_multiplier)
+        margin = estimate_strategy_margin(rolling_entry_legs, entry_spot, contract_multiplier=contract_multiplier)
         rows.append(
             {
                 "entry_date": entry_date,
                 "exit_date": exit_date,
                 "entry_spot": entry_spot,
-                "terminal_price": terminal_price,
-                "historical_return": terminal_price / entry_spot - 1,
+                "exit_spot": exit_spot,
+                "historical_return": exit_spot / entry_spot - 1,
+                "entry_sigma": entry_sigma,
+                "exit_sigma": exit_sigma,
+                "model_entry_value": model_entry_value,
+                "model_exit_value": model_exit_value,
                 "gross_profit": gross_profit,
                 "transaction_cost": transaction_cost,
                 "strategy_profit": profit,
@@ -431,9 +435,30 @@ def rolling_strategy_backtest(
     return pd.DataFrame(rows).set_index("exit_date")
 
 
-def rank_strategies_by_backtest(strategy_results):
-    """Rank strategies from already-computed backtest metrics."""
+def _rolling_realized_volatility(log_returns, trading_days):
+    values = pd.Series(log_returns).dropna().astype(float)
+    if len(values) < 5:
+        raise ValueError("Not enough returns to estimate rolling volatility.")
+    lags = max(1, int(np.floor(4 * (len(values) / 100) ** (2 / 9))))
+    centered = values.to_numpy() - float(values.mean())
+    variance = float(np.mean(centered * centered))
+    for lag in range(1, min(lags, len(centered) - 1) + 1):
+        autocovariance = float(np.mean(centered[lag:] * centered[:-lag]))
+        bartlett_weight = 1 - lag / (lags + 1)
+        variance += 2 * bartlett_weight * autocovariance
+    volatility = float(np.sqrt(max(variance, 1e-8) * trading_days))
+    return max(volatility, 0.01)
 
+
+def _intrinsic_value(stock_price, strike, option_kind):
+    if option_kind == "call":
+        return max(stock_price - strike, 0.0)
+    if option_kind == "put":
+        return max(strike - stock_price, 0.0)
+    raise ValueError("option_kind must be 'call' or 'put'.")
+
+
+def rank_strategies_by_backtest(strategy_results):
     rows = []
     for strategy_name, result in strategy_results.items():
         metrics = result["metrics"]
@@ -466,8 +491,6 @@ def rank_strategies_by_backtest(strategy_results):
 
 
 def estimate_strategy_margin(legs, spot, width=0.8, contract_multiplier=1):
-    """Estimate risk capital from payoff loss, debit paid, and short-option margin."""
-
     grid = payoff_grid(spot, legs, width=width, points=401)
     worst_profit = float(grid["strategy_profit"].min()) * contract_multiplier
     net_debit = sum(
@@ -483,8 +506,6 @@ def estimate_strategy_margin(legs, spot, width=0.8, contract_multiplier=1):
 
 
 def _short_option_margin(legs, spot, contract_multiplier):
-    """Approximate short-option margin using a Reg-T style risk formula."""
-
     margin = 0.0
     for leg in legs:
         if leg["side"] != "short":
@@ -504,8 +525,6 @@ def _short_option_margin(legs, spot, contract_multiplier):
 
 
 def backtest_metrics(backtest, margin, initial_capital=100000, holding_days=1, trading_days=252):
-    """Summarize rolling strategy P&L into common backtest risk metrics."""
-
     profit = backtest["strategy_profit"].astype(float)
     if profit.empty:
         raise ValueError("backtest must contain at least one row.")
@@ -552,8 +571,6 @@ def backtest_metrics(backtest, margin, initial_capital=100000, holding_days=1, t
 
 
 def payoff_grid(spot, legs, width=0.35, points=101):
-    """Create terminal stock prices and strategy profits for payoff charts."""
-
     prices = np.linspace(spot * (1 - width), spot * (1 + width), points)
     profit = strategy_profit(prices, legs)
     return pd.DataFrame({"stock_price": prices, "strategy_profit": profit})

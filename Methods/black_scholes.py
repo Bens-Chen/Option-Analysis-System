@@ -1,5 +1,3 @@
-"""Closed-form Black-Scholes pricing for European calls and puts."""
-
 import math
 from  scipy.stats import norm  # pip install scipy
 

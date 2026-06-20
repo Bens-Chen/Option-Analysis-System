@@ -1,5 +1,3 @@
-"""Basic option payoff primitives used by strategy modules."""
-
 import numpy as np
 
 

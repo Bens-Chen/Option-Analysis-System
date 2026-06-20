@@ -1,5 +1,3 @@
-"""Rainbow option pricing by multi-asset simulation."""
-
 import math
 import numpy as np
 

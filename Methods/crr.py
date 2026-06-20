@@ -1,5 +1,3 @@
-"""Cox-Ross-Rubinstein binomial-tree pricing implementations."""
-
 import math
 import numpy as np
 

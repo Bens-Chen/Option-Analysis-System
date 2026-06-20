@@ -1,5 +1,3 @@
-"""Asian option pricing by analytic approximation and simulation."""
-
 import math
 import numpy as np
 import copy

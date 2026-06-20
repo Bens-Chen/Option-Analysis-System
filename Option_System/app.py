@@ -1,5 +1,3 @@
-"""Streamlit app for live option quotes, Greeks, backtests, and risk views."""
-
 from datetime import date
 import importlib.util
 from pathlib import Path
@@ -38,7 +36,6 @@ from Option_System.analytics import (
 from Option_System.strategy_engine import (
     backtest_metrics,
     build_chain_strategy_legs,
-    estimate_strategy_margin,
     payoff_grid,
     rolling_strategy_backtest,
 )
@@ -59,8 +56,6 @@ from iv_smile import IV_smile_arrays, fit_svi_smile
 
 
 def _load_vix_svix_module():
-    """Load the extensionless VIX/SVIX module kept in Implied_Volatility."""
-
     module_path = IMPLIED_VOL_ROOT / "vix_svix"
     loader = SourceFileLoader("vix_svix_module", str(module_path))
     spec = importlib.util.spec_from_loader("vix_svix_module", loader)
@@ -107,9 +102,7 @@ def _load_market_context(
     min_volume,
     require_bid_ask,
 ):
-    """Fetch price history and the current option chain used by all app pages."""
-
-    history = _cached_price_history(ticker, "5y")
+    history = _cached_price_history(ticker, "10y")
     spot = latest_close(history)
     historical_vol = estimate_annualized_volatility(history)
     chain_preview = _cached_option_chain(ticker)
@@ -157,8 +150,6 @@ def _load_market_context(
 
 
 def _selected_contract_analytics(context, selected_symbol, option_kind, option_style, risk_free_rate, dividend_yield):
-    """Compute pricing, IV, and Greeks for the selected option contract."""
-
     chain_table = context["chain_table"]
     selected = chain_table.loc[chain_table["contractSymbol"] == selected_symbol].iloc[0].to_dict()
     spot = context["spot"]
@@ -192,7 +183,7 @@ def _selected_contract_analytics(context, selected_symbol, option_kind, option_s
             float(selected["strike"]),
             risk_free_rate,
             dividend_yield,
-            historical_vol,
+            model_iv,
             T,
             option_kind,
             option_style="American",
@@ -215,7 +206,7 @@ def _selected_contract_analytics(context, selected_symbol, option_kind, option_s
             float(selected["strike"]),
             risk_free_rate,
             dividend_yield,
-            historical_vol,
+            model_iv,
             T,
             option_kind,
         )
@@ -242,8 +233,6 @@ def _selected_contract_analytics(context, selected_symbol, option_kind, option_s
 
 
 def _render_contract_quote(context, analytics, active_ticker, option_style):
-    """Render the selected contract quote and nearby yfinance contracts."""
-
     st.subheader("Selected Contract Quote")
     quote_cols = st.columns(4)
     quote_cols[0].metric("yfinance price", f"{analytics['market_price']:.4f}")
@@ -276,8 +265,6 @@ def _render_contract_quote(context, analytics, active_ticker, option_style):
 
 
 def _render_greek_letters(context, analytics):
-    """Render single-contract Greeks plus IV smile and VIX/SVIX indicators."""
-
     st.subheader("Greek Letters")
     greeks = analytics["greeks"]
     metric_cols = st.columns(5)
@@ -335,8 +322,6 @@ def _render_greek_letters(context, analytics):
 
 
 def _build_strategy_legs(strategy, selected, chain, other_strike, ratio_quantity=2):
-    """Convert the selected strategy name into option legs for payoff/backtest."""
-
     if strategy == "Custom":
         custom_text = st.text_area(
             "CSV columns: option_kind,side,strike,premium,quantity",
@@ -371,8 +356,6 @@ def _format_metric(value, fmt="{:.2f}", missing="N/A"):
 
 
 def _portfolio_greeks(legs, spot, risk_free_rate, dividend_yield, volatility, time_to_maturity, contract_multiplier):
-    """Aggregate leg Greeks into one strategy-level Greek exposure."""
-
     totals = {"delta": 0.0, "gamma": 0.0, "theta_per_day": 0.0, "vega": 0.0, "rho": 0.0}
     for leg in legs:
         greeks = black_scholes_greeks(
@@ -392,8 +375,6 @@ def _portfolio_greeks(legs, spot, risk_free_rate, dividend_yield, volatility, ti
 
 
 def _render_portfolio_greeks(legs, context, analytics, contract_multiplier):
-    """Show portfolio Greeks beside the chosen backtest strategy."""
-
     greeks = _portfolio_greeks(
         legs,
         context["spot"],
@@ -417,15 +398,13 @@ def _render_portfolio_greeks(legs, context, analytics, contract_multiplier):
 
 
 def _backtest_diagnostics(metrics, backtest, holding_days, non_overlapping):
-    """Create short warnings when backtest metrics may be misleading."""
-
     notes = []
     if metrics["win_rate"] >= 0.70:
         notes.append("Win rate is high. Check whether the strategy is selling tail risk or benefiting from scaled current premiums.")
     if metrics["win_rate"] <= 0.40:
         notes.append("Win rate is low. The payoff may need larger underlying moves or better strike selection.")
     if metrics["return_on_capital"] > 0.20:
-        notes.append("Return on capital is unusually high. Validate transaction costs, bid/ask execution, and the scenario-backtest assumption.")
+        notes.append("Return on capital is unusually high. Validate volatility proxy, transaction costs, and model-pricing assumptions.")
     if metrics["expected_shortfall_95"] > abs(metrics["var_95"]) * 1.5:
         notes.append("Expected shortfall is much larger than VaR, so losses are concentrated in the worst scenarios.")
     if not non_overlapping and holding_days > 1:
@@ -445,8 +424,6 @@ def _render_backtest(
     transaction_cost_per_contract,
     contract_multiplier,
 ):
-    """Render strategy construction, payoff, rolling backtest, and diagnostics."""
-
     st.subheader("Backtest")
     strategy = st.selectbox(
         "Strategy",
@@ -496,8 +473,11 @@ def _render_backtest(
         slippage_per_contract=slippage_per_contract,
         transaction_cost_per_contract=transaction_cost_per_contract,
         contract_multiplier=contract_multiplier,
+        risk_free_rate=risk_free_rate,
+        dividend_yield=dividend_yield,
+        time_to_maturity=analytics["T"],
     )
-    margin = estimate_strategy_margin(legs, context["spot"], contract_multiplier=contract_multiplier)
+    margin = float(backtest["margin_estimate"].max())
     metrics = backtest_metrics(
         backtest,
         margin,
@@ -506,17 +486,17 @@ def _render_backtest(
     )
 
     summary_cols = st.columns(6)
-    summary_cols[0].metric("Avg PnL", f"{metrics['avg_pnl']:.2f}", f"{metrics['avg_pnl'] / initial_capital:.2%} of capital")
-    summary_cols[1].metric("Total PnL", f"{metrics['total_pnl']:.2f}", f"{metrics['return_on_capital']:.2%} of capital")
-    summary_cols[2].metric("Win rate", f"{metrics['win_rate']:.2%}", f"{metrics['win_rate'] - 0.50:+.2%} vs 50%")
-    summary_cols[3].metric("Sharpe", _format_metric(metrics["sharpe_ratio"]), "annualized")
-    summary_cols[4].metric("MDD", f"{metrics['mdd']:.2f}", f"{metrics['mdd_pct']:.2%} of capital")
-    summary_cols[5].metric("Return on capital", f"{metrics['return_on_capital']:.2%}", f"{metrics['total_pnl']:.2f} PnL")
+    summary_cols[0].metric("Avg PnL", f"{metrics['avg_pnl']:.2f}")
+    summary_cols[1].metric("Total PnL", f"{metrics['total_pnl']:.2f}")
+    summary_cols[2].metric("Win rate", f"{metrics['win_rate']:.2%}")
+    summary_cols[3].metric("Sharpe", _format_metric(metrics["sharpe_ratio"]))
+    summary_cols[4].metric("MDD", f"{metrics['mdd']:.2f}")
+    summary_cols[5].metric("Return on capital", f"{metrics['return_on_capital']:.2%}")
     risk_cols = st.columns(4)
-    risk_cols[0].metric("Ending equity", f"{metrics['ending_equity']:.2f}", f"{metrics['ending_equity'] - initial_capital:.2f} vs initial")
-    risk_cols[1].metric("Margin est.", f"{metrics['margin_estimate']:.2f}", f"{metrics['margin_estimate'] / initial_capital:.2%} of capital")
-    risk_cols[2].metric("VaR 95%", f"{metrics['var_95_amount']:.2f}", f"{metrics['var_95']:.2%} of capital")
-    risk_cols[3].metric("ES 95%", f"{metrics['expected_shortfall_95_amount']:.2f}", f"{metrics['expected_shortfall_95']:.2%} of capital")
+    risk_cols[0].metric("Ending equity", f"{metrics['ending_equity']:.2f}")
+    risk_cols[1].metric("Margin est.", f"{metrics['margin_estimate']:.2f}")
+    risk_cols[2].metric("VaR 95%", f"{metrics['var_95_amount']:.2f}")
+    risk_cols[3].metric("ES 95%", f"{metrics['expected_shortfall_95_amount']:.2f}")
 
     plot_left, plot_right = st.columns(2)
     with plot_left:
@@ -544,7 +524,7 @@ def _render_backtest(
         ax.axhline(0, color="black", linewidth=1)
         ax.set_xlabel("Exit date")
         ax.set_ylabel("PnL")
-        ax.set_title("Rolling backtest PnL")
+        ax.set_title("Model rolling backtest PnL")
         ax.legend()
         st.pyplot(fig)
 
@@ -554,14 +534,12 @@ def _render_backtest(
         for note in notes:
             st.write(f"- {note}")
     st.caption(
-        "Scenario backtest: yfinance does not provide historical option chains here, so the selected current option structure is rescaled through historical underlying prices."
+        "Model rolling backtest: each entry date rebuilds the same moneyness strategy and prices entry/exit options with BS plus a rolling Newey-West volatility proxy from yfinance underlying prices."
     )
     st.dataframe(backtest_plot.tail(30), use_container_width=True)
 
 
 def _live_vol_curve_nodes(context):
-    """Build OTM IV nodes from the live option chain for the vol curve monitor."""
-
     rows = []
     forward = context["spot"]
     for option_kind, table in [("call", context["calls_with_mid"]), ("put", context["puts_with_mid"])]:
@@ -588,8 +566,6 @@ def _live_vol_curve_nodes(context):
 
 
 def _historical_price_shocks(history, holding_days):
-    """Use historical holding-period moves to pick symmetric risk shocks."""
-
     close = history["Close"].dropna().astype(float)
     returns = close.pct_change(int(holding_days)).dropna()
     if len(returns) < 20:
@@ -601,8 +577,6 @@ def _historical_price_shocks(history, holding_days):
 
 
 def _render_risk_management(context, analytics):
-    """Render scenario risk matrix, VaR/ES, and volatility curve monitor."""
-
     st.subheader("Risk Management")
     selected = analytics["selected"]
     risk_legs = [

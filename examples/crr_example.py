@@ -1,5 +1,3 @@
-"""Example script for running the CRR binomial-tree pricing function."""
-
 from pathlib import Path
 import sys
 

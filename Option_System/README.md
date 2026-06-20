@@ -1,6 +1,6 @@
 # Option Analysis System
 
-This folder contains the interactive system for searching option contracts, viewing IV and Greek letters, plotting strategy payoff, and running a simple historical backtest.
+This folder contains the interactive system for searching option contracts, viewing IV and Greek letters, plotting strategy payoff, and running a model rolling strategy backtest.
 
 Run it with:
 
@@ -18,7 +18,7 @@ streamlit run Option_System/app.py
 6. Optionally show American-style CRR Greek estimates.
 7. Plot the selected strategy payoff.
 8. Let the user enter custom option legs.
-9. Run a latest-5-year historical scenario backtest using past underlying returns.
+9. Run a latest-10-year model rolling backtest using yfinance underlying prices and a rolling Newey-West volatility proxy.
 10. Build research tables for volatility surface, model mispricing, robustness, tear sheet metrics, event analysis, and paper alerts.
 
 ## Research Platform Features
@@ -37,11 +37,11 @@ These features are intentionally table-first. The goal is to make each calculati
 
 ## Important Limitation
 
-The backtest is a scenario backtest, not a full historical option-chain backtest.
+The backtest is a model rolling backtest, not a true historical option-chain backtest.
 
-It uses historical stock returns and applies those moves to the current option strategy. This is useful for learning payoff behavior, but it does not reconstruct old option chains, bid/ask spreads, or historical IV surfaces.
+Each entry date rebuilds the selected strategy by the same strike/spot ratios as the live strategy. It estimates entry and exit option values with Black-Scholes and a rolling Newey-West volatility proxy from yfinance underlying prices. This is more realistic than applying today's contract directly to old prices, but it still does not reconstruct old option chains, historical bid/ask spreads, or historical IV surfaces.
 
-The displayed metrics include average PnL, total PnL, win rate, Sharpe ratio, MDD, estimated margin, return on margin, worst scenario, and best scenario. The margin estimate is based on the strategy payoff grid, so uncovered short-option risk is only approximated inside the plotted scenario range.
+The displayed metrics include average PnL, total PnL, win rate, Sharpe ratio, MDD, estimated margin, return on margin, VaR, and Expected Shortfall. The margin estimate is still approximate, especially for uncovered short-option risk.
 
 The IV-rank value in the app is also a proxy. True IV rank requires historical implied volatility observations. Since yfinance does not provide a complete historical option-chain database here, the app ranks current ATM IV against the current surface range instead.
 

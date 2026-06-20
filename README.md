@@ -1,6 +1,6 @@
 # Option Pricing 
 
-This repository is an option-pricing project. It introduces classic pricing methods, calibration tools, exotic option examples, Greek-letter estimation, hedging ideas, and selected trading strategies with Python implementations(including backtest).
+This repository is an option-pricing project. It introduces classic pricing methods, calibration tools, exotic option examples, Greek-letter estimation, hedging ideas, selected trading strategies, risk-management tools, and Python backtests.
 
 ## Features
 
@@ -8,10 +8,11 @@ This repository is an option-pricing project. It introduces classic pricing meth
 - Greek Letters estimation
 - Implied volatility calibration
 - Exotic option : Asian, Lookback, and Rainbow options
-- Option Trading Strateies 
+- Option Trading Strategies
 - Market Data: yfinance connection for price history, option chains, IV, and contract search
 - Interactive Option System 
 - Research Platform: volatility surface, mispricing scanner, strategy robustness, tear sheet metrics, event straddle analysis, and paper alerts
+- Risk Management: scenario risk matrix, VaR/Expected Shortfall, volatility curve monitor, and volatility tracker
 
 ## Installation
 
@@ -37,6 +38,8 @@ Run the interactive option analysis system:
 ```bash
 streamlit run Option_System/app.py
 ```
+
+The Streamlit app includes contract quotes, Greek letters, strategy backtests, and risk-management views.
 
 Run tests:
 
@@ -87,12 +90,12 @@ Option_System/
 
 Risk_Management/
   README.md                  # risk metrics, volatility tracking, and visuals
-  risk_matrix.py
-  risk_visuals.py
-  utils.py
-  var_es.py
-  vol_curve_monitor.py
-  vol_tracker.py
+  risk_matrix.py             # P&L and Greeks across underlying price shocks
+  risk_visuals.py            # reusable risk chart entrypoint
+  utils.py                   # table formatting and risk color helpers
+  var_es.py                  # historical and EWMA VaR / Expected Shortfall
+  vol_curve_monitor.py       # IV smile, curvature, and curve comparison monitor
+  vol_tracker.py             # volatility and underlying price tracking over time
 
 Trading_Strategies/
   README.md                  # interval, butterfly, straddle, strangle, and spreads
@@ -130,8 +133,9 @@ tests/
 3. Read `Implied_Volatility/README.md` for implied volatility, IV smile, VIX, and SVIX.
 4. Read `Greak_Letters/README.md` for Greeks and hedging.
 5. Read `Trading_Strategies/README.md` for selected trading strategies.
-6. Read `Option_System/README.md` for the interactive option-search system.
-7. Check `examples/` and `tests/` to see how the code is used.
+6. Read `Risk_Management/README.md` for VaR/ES, scenario matrices, volatility curve monitoring, and volatility tracking.
+7. Read `Option_System/README.md` for the interactive option-search, backtest, research, and risk dashboard.
+8. Check `examples/` and `tests/` to see how the code is used.
 
 ## Disclaimer
 

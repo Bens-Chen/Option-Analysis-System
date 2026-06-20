@@ -1,5 +1,3 @@
-"""Volatility time-series tracker for realized-volatility monitoring."""
-
 from datetime import datetime, timedelta
 
 import matplotlib.dates as mdates

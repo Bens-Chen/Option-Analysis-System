@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from Option_System.analytics import black_scholes_greeks, crr_greeks_by_bump
+from Option_System.analytics import black_scholes_greeks, crr_greeks_by_bump, implied_volatility_from_price, option_price_from_bs
 from Option_System.research import (
     build_research_chain_table,
     event_straddle_analysis,
@@ -14,8 +14,6 @@ from Option_System.research import (
 from Option_System.strategy_engine import (
     backtest_metrics,
     build_chain_strategy_legs,
-    estimate_strategy_margin,
-    historical_scenario_backtest,
     rolling_strategy_backtest,
     strategy_profit,
 )
@@ -35,6 +33,23 @@ def test_black_scholes_greeks_returns_expected_keys():
     assert {"delta", "gamma", "theta_per_day", "vega", "rho"} <= set(greeks)
 
 
+def test_implied_vol_price_roundtrip_matches_market_price():
+    market_price = 4.25
+    model_iv = implied_volatility_from_price(
+        market_price=market_price,
+        S=100,
+        K=102,
+        r=0.04,
+        q=0.0,
+        T=30 / 365,
+        option_kind="call",
+    )
+
+    model_price = option_price_from_bs(100, 102, 0.04, 0.0, model_iv, 30 / 365, "call")
+
+    assert model_price == pytest.approx(market_price)
+
+
 def test_strategy_profit_combines_custom_legs():
     legs = [
         {"option_kind": "call", "side": "long", "strike": 100, "premium": 5, "quantity": 1},
@@ -46,30 +61,18 @@ def test_strategy_profit_combines_custom_legs():
     assert profit.tolist() == [1.0, -9.0, 1.0]
 
 
-def test_historical_scenario_backtest_returns_profit_column():
-    history = pd.DataFrame({"Close": [100, 101, 102, 99, 103, 105]})
-    legs = [{"option_kind": "call", "side": "long", "strike": 100, "premium": 3, "quantity": 1}]
-
-    result = historical_scenario_backtest(history, spot=100, legs=legs, holding_days=1)
-
-    assert "strategy_profit" in result.columns
-    assert not result.empty
-
-
 def test_backtest_metrics_includes_sharpe_mdd_and_margin():
-    history = pd.DataFrame({"Close": [100, 101, 102, 99, 103, 105]})
-    legs = [{"option_kind": "call", "side": "long", "strike": 100, "premium": 3, "quantity": 1}]
-    result = historical_scenario_backtest(history, spot=100, legs=legs, holding_days=1)
-    margin = estimate_strategy_margin(legs, spot=100)
+    result = pd.DataFrame({"strategy_profit": [100.0, -40.0, 80.0]})
 
-    metrics = backtest_metrics(result, margin)
+    metrics = backtest_metrics(result, margin=500)
 
     assert {"sharpe_ratio", "mdd", "margin_estimate", "return_on_margin"} <= set(metrics)
     assert metrics["margin_estimate"] > 0
 
 
-def test_rolling_backtest_uses_non_overlapping_trades_and_costs():
-    history = pd.DataFrame({"Close": [100, 102, 104, 101, 103, 106, 108]})
+def test_rolling_backtest_reprices_strategy_with_model_premiums():
+    prices = [100 + index * 0.2 + (index % 5) * 0.1 for index in range(90)]
+    history = pd.DataFrame({"Close": prices})
     legs = [
         {
             "option_kind": "call",
@@ -92,11 +95,16 @@ def test_rolling_backtest_uses_non_overlapping_trades_and_costs():
         slippage_per_contract=0.1,
         transaction_cost_per_contract=0.5,
         contract_multiplier=100,
+        risk_free_rate=0.04,
+        dividend_yield=0.0,
+        time_to_maturity=30 / 365,
+        volatility_window=20,
     )
 
-    assert len(result) == 3
-    assert {"gross_profit", "transaction_cost", "margin_estimate"} <= set(result.columns)
+    assert not result.empty
+    assert {"model_entry_value", "model_exit_value", "entry_sigma", "exit_sigma", "margin_estimate"} <= set(result.columns)
     assert (result["transaction_cost"] == 1.0).all()
+    assert (result["entry_sigma"] > 0).all()
 
 
 def test_backtest_metrics_uses_initial_capital_returns():

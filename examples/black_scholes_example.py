@@ -1,5 +1,3 @@
-"""Example script for running the Black-Scholes pricing function."""
-
 from pathlib import Path
 import sys
 
