@@ -1,17 +1,16 @@
-# Option Pricing 
+# Option Analysis System
 
-This repository is an option-pricing project. It introduces classic pricing methods, calibration tools, exotic option examples, Greek-letter estimation, hedging ideas, selected trading strategies, risk-management tools, and Python backtests.
+This repository is an option related project. It introduces classic pricing methods, calibration tools, exotic option examples, Greek-letter estimation, hedging ideas, selected trading strategies, risk-management tools, and Python backtests.
 
 ## Features
 
 - Methods: Black-Scholes, CRR, Monte Carlo and Finite Difference
 - Greek Letters estimation
-- Implied volatility calibration
-- Exotic option : Asian, Lookback, and Rainbow options
+- Implied volatility calibration(IV smile and surface)
+- Exotic option : Binary,Barrier, Asian, Lookback, and Rainbow options
 - Option Trading Strategies
 - Market Data: yfinance connection for price history, option chains, IV, and contract search
 - Interactive Option System 
-- Research Platform: volatility surface, mispricing scanner, strategy robustness, tear sheet metrics, event straddle analysis, and paper alerts
 - Risk Management: scenario risk matrix, VaR/Expected Shortfall, volatility curve monitor, and volatility tracker
 
 ## Installation
@@ -90,15 +89,15 @@ Option_System/
 
 Risk_Management/
   README.md                  # risk metrics, volatility tracking, and visuals
-  risk_matrix.py             # P&L and Greeks across underlying price shocks
-  risk_visuals.py            # reusable risk chart entrypoint
-  utils.py                   # table formatting and risk color helpers
-  var_es.py                  # historical and EWMA VaR / Expected Shortfall
-  vol_curve_monitor.py       # IV smile, curvature, and curve comparison monitor
-  vol_tracker.py             # volatility and underlying price tracking over time
+  risk_matrix.py             
+  risk_visuals.py            
+  utils.py                   
+  var_es.py                  
+  vol_curve_monitor.py       
+  vol_tracker.py            
 
 Trading_Strategies/
-  README.md                  # interval, butterfly, straddle, strangle, and spreads
+  README.md                  # interval, butterfly, straddle, strangle, spreads...
   butterfly.py
   iron_condor.py
   interval_trading.py
