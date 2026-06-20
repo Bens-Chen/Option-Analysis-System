@@ -9,61 +9,6 @@ from Methods.black_scholes import BS
 from Methods.crr import CRR_O_n
 
 
-def implied_volatility_bisection(
-    S,
-    K,
-    r,
-    q,
-    T,
-    market_price,
-    option_kind="call",
-    lower_bound=1e-6,
-    upper_bound=5.0,
-    tolerance=1e-8,
-    max_iterations=200,
-):
-    """Return the Black-Scholes implied volatility with bisection."""
-
-    if S <= 0 or K <= 0:
-        raise ValueError("S and K must be positive.")
-    if T <= 0:
-        raise ValueError("T must be positive.")
-    if market_price <= 0:
-        raise ValueError("market_price must be positive.")
-    if option_kind not in {"call", "put"}:
-        raise ValueError("option_kind must be 'call' or 'put'.")
-
-    price_index = 0 if option_kind == "call" else 1
-
-    def objective(sigma):
-        return BS(S, K, r, q, sigma, T)[price_index] - market_price
-
-    low = lower_bound
-    high = upper_bound
-    f_low = objective(low)
-    f_high = objective(high)
-
-    if f_low * f_high > 0:
-        raise ValueError(
-            "Cannot bracket implied volatility. Check market_price or widen bounds."
-        )
-
-    for _ in range(max_iterations):
-        mid = (low + high) / 2
-        f_mid = objective(mid)
-
-        if abs(f_mid) < tolerance:
-            return mid
-
-        if f_low * f_mid < 0:
-            high = mid
-            f_high = f_mid
-        else:
-            low = mid
-            f_low = f_mid
-
-    return (low + high) / 2
-
 
 # Bisection method
 def Bisection(S, K, r, q, T, market_price_option, n, an, bn):
