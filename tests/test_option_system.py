@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from Implied_Volatility.iv_surface import current_otm_surface_iv
+from Implied_Volatility.iv_surface import current_otm_surface_iv, current_otm_surface_nodes
 from Option_System.analytics import black_scholes_greeks, crr_greeks_by_bump, implied_volatility_from_price, option_price_from_bs
 from Option_System.research import (
     build_research_chain_table,
@@ -133,10 +133,22 @@ def test_current_otm_surface_iv_interpolates_from_otm_nodes():
         }
     )
 
-    surface_iv, source = current_otm_surface_iv(calls, puts, forward=100, strike=105)
+    surface_iv, source = current_otm_surface_iv(calls, puts, forward=100, strike=105, T=30 / 365)
 
     assert source == "current OTM IV surface"
     assert 0.20 < surface_iv < 0.30
+
+
+def test_current_otm_surface_nodes_use_standardized_log_moneyness():
+    calls = pd.DataFrame({"strike": [105.0, 110.0], "impliedVolatility": [0.22, 0.24]})
+    puts = pd.DataFrame({"strike": [90.0, 95.0], "impliedVolatility": [0.28, 0.25]})
+
+    nodes = current_otm_surface_nodes(calls, puts, forward=100, T=30 / 365, atm_iv=0.20)
+
+    first = nodes.iloc[0]
+    expected = pytest.approx(first["log_moneyness"] / (0.20 * (30 / 365) ** 0.5))
+    assert {"moneyness", "log_moneyness", "standardized_moneyness"} <= set(nodes.columns)
+    assert first["standardized_moneyness"] == expected
 
 
 def test_crr_greeks_supports_american_option_style():

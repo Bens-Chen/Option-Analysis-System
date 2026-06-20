@@ -7,7 +7,6 @@ import pandas as pd
 
 
 def build_demo_vol_tracker(periods=120):
-    """Create demo intraday changes for ATM vol and underlying prices."""
 
     times = [datetime(2026, 6, 18, 9, 30) + timedelta(minutes=3 * i) for i in range(periods)]
     rng = np.random.default_rng(7)

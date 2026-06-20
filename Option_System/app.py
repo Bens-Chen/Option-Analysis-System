@@ -52,7 +52,7 @@ from Option_System.research import (
     volatility_surface_table,
 )
 from Risk_Management.risk_matrix import OptionLeg, build_risk_matrix, plot_risk_matrix
-from Risk_Management.var_es import ewma_var_es_summary, historical_var_es_summary
+from Risk_Management.var_es import ewma_var_es_summary, historical_var_es_summary, iv_smoothed_var_es_summary
 from Risk_Management.vol_curve_monitor import plot_vol_curve_monitor, vol_curve_diagnostics
 from iv_smile import IV_smile_arrays, fit_svi_smile
 
@@ -170,6 +170,7 @@ def _selected_contract_analytics(context, selected_symbol, option_kind, option_s
             context["puts_with_mid"],
             forward,
             float(selected["strike"]),
+            T,
         )
     except ValueError:
         model_volatility = historical_vol
@@ -758,11 +759,22 @@ def _render_risk_management(context, analytics):
         filtered_summary = ewma_var_es_summary(returns, confidence_level=0.95, portfolio_value=context["spot"])
     except ValueError:
         filtered_summary = var_summary
-    risk_cols = st.columns(4)
+    try:
+        iv_summary = iv_smoothed_var_es_summary(
+            returns,
+            annualized_volatility=analytics["model_volatility"],
+            confidence_level=0.95,
+            portfolio_value=context["spot"],
+        )
+    except ValueError:
+        iv_summary = var_summary
+    risk_cols = st.columns(6)
     risk_cols[0].metric("Historical VaR 95%", f"{var_summary['var']:.2f}")
     risk_cols[1].metric("Expected Shortfall 95%", f"{var_summary['expected_shortfall']:.2f}")
     risk_cols[2].metric("EWMA VaR 95%", f"{filtered_summary['var']:.2f}")
     risk_cols[3].metric("EWMA ES 95%", f"{filtered_summary['expected_shortfall']:.2f}")
+    risk_cols[4].metric("IV-smoothed VaR 95%", f"{iv_summary['var']:.2f}")
+    risk_cols[5].metric("IV-smoothed ES 95%", f"{iv_summary['expected_shortfall']:.2f}")
 
     st.subheader("Vol Curve Monitor")
     curves = _live_vol_curve_nodes(context)

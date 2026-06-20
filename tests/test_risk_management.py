@@ -10,6 +10,8 @@ from Risk_Management.risk_visuals import (
     historical_expected_shortfall,
     historical_var,
     historical_var_es_summary,
+    iv_smoothed_return_distribution,
+    iv_smoothed_var_es_summary,
     ewma_var_es_summary,
     parametric_var,
     plot_risk_matrix,
@@ -75,10 +77,32 @@ def test_historical_var_es_summary_includes_tail_count():
     assert summary["tail_observations"] == 1
 
 
-def test_parametric_var_uses_positive_volatility():
-    var = parametric_var(annualized_volatility=0.2, confidence_level=0.95, portfolio_value=100000)
+def test_parametric_var_uses_iv_smoothed_historical_returns():
+    returns = [-0.04, -0.02, -0.01, 0.0, 0.01, 0.03]
 
-    assert var > 0
+    low_iv_var = parametric_var(returns, annualized_volatility=0.1, confidence_level=0.8, portfolio_value=100000)
+    high_iv_var = parametric_var(returns, annualized_volatility=0.2, confidence_level=0.8, portfolio_value=100000)
+
+    assert low_iv_var > 0
+    assert high_iv_var == pytest.approx(low_iv_var * 2)
+
+
+def test_iv_smoothed_return_distribution_matches_target_volatility():
+    returns = [-0.04, -0.02, -0.01, 0.0, 0.01, 0.03]
+
+    distribution = iv_smoothed_return_distribution(returns, annualized_volatility=0.2)
+
+    assert distribution.std(ddof=1) == pytest.approx(0.2 / (252**0.5))
+
+
+def test_iv_smoothed_var_es_summary_returns_scaled_tail_metrics():
+    returns = [-0.04, -0.02, -0.01, 0.0, 0.01, 0.03]
+
+    summary = iv_smoothed_var_es_summary(returns, annualized_volatility=0.2, confidence_level=0.8, portfolio_value=100000)
+
+    assert summary["var"] > 0
+    assert summary["expected_shortfall"] >= summary["var"]
+    assert summary["annualized_volatility"] == pytest.approx(0.2)
 
 
 def test_ewma_var_es_summary_returns_tail_metrics():

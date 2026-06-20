@@ -8,6 +8,8 @@ from .var_es import (
     historical_expected_shortfall,
     historical_var,
     historical_var_es_summary,
+    iv_smoothed_return_distribution,
+    iv_smoothed_var_es_summary,
     parametric_var,
 )
 from .vol_curve_monitor import build_demo_vol_curves, plot_vol_curve_monitor, vol_curve_diagnostics
@@ -23,6 +25,8 @@ __all__ = [
     "historical_expected_shortfall",
     "historical_var",
     "historical_var_es_summary",
+    "iv_smoothed_return_distribution",
+    "iv_smoothed_var_es_summary",
     "parametric_var",
     "plot_risk_matrix",
     "plot_vol_curve_monitor",

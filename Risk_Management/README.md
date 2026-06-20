@@ -16,11 +16,18 @@ options and volatility positions can have fat-tail losses.
 - `historical_var`: historical simulation VaR from returns
 - `historical_expected_shortfall`: average loss after the VaR cutoff
 - `historical_var_es_summary`: VaR, ES, cutoff return, and tail count together
-- `parametric_var`: normal-distribution VaR from annualized volatility
+- `iv_smoothed_return_distribution`: historical daily returns scaled to current annualized IV
+- `iv_smoothed_var_es_summary`: VaR and ES from the IV-smoothed return distribution
+- `parametric_var`: VaR from the IV-smoothed historical-return distribution
 
 The functions return positive loss numbers. If `portfolio_value=100000` and
 `var=3000`, the interpretation is that the historical loss threshold is about
 3,000 currency units at the chosen confidence level.
+
+The IV-smoothed method keeps the empirical shape of historical daily returns,
+including skew and fat tails, but rescales the distribution so its volatility
+matches the current implied-volatility input. This avoids assuming a normal
+distribution while still making the VaR responsive to the current option market.
 
 ## Movement Risk - Risk Matrix
 
