@@ -1,3 +1,5 @@
+"""Barrier option pricing by path simulation."""
+
 import numpy as np
 
 

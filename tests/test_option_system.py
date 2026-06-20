@@ -161,6 +161,69 @@ def test_build_chain_strategy_legs_adds_put_butterfly():
     assert [leg["side"] for leg in legs] == ["long", "short", "long"]
 
 
+def _sample_spread_chains():
+    calls = pd.DataFrame(
+        [
+            {"strike": 90, "bid": 12.0, "ask": 12.4, "lastPrice": 12.2},
+            {"strike": 95, "bid": 8.0, "ask": 8.4, "lastPrice": 8.2},
+            {"strike": 100, "bid": 5.0, "ask": 5.4, "lastPrice": 5.2},
+            {"strike": 105, "bid": 2.5, "ask": 2.9, "lastPrice": 2.7},
+            {"strike": 110, "bid": 1.1, "ask": 1.5, "lastPrice": 1.3},
+        ]
+    )
+    puts = pd.DataFrame(
+        [
+            {"strike": 90, "bid": 1.0, "ask": 1.4, "lastPrice": 1.2},
+            {"strike": 95, "bid": 2.0, "ask": 2.4, "lastPrice": 2.2},
+            {"strike": 100, "bid": 4.0, "ask": 4.4, "lastPrice": 4.2},
+            {"strike": 105, "bid": 7.0, "ask": 7.4, "lastPrice": 7.2},
+            {"strike": 110, "bid": 11.0, "ask": 11.4, "lastPrice": 11.2},
+        ]
+    )
+    selected = {"strike": 100, "option_kind": "call", "bid": 5.0, "ask": 5.4, "lastPrice": 5.2}
+    return calls, puts, selected
+
+
+def test_build_chain_strategy_legs_adds_bull_call_spread():
+    calls, puts, selected = _sample_spread_chains()
+
+    legs = build_chain_strategy_legs("Bull Call Spread", selected, calls, puts, other_strike=5)
+
+    assert [leg["option_kind"] for leg in legs] == ["call", "call"]
+    assert [leg["strike"] for leg in legs] == [100.0, 105.0]
+    assert [leg["side"] for leg in legs] == ["long", "short"]
+
+
+def test_build_chain_strategy_legs_adds_bear_put_spread():
+    calls, puts, selected = _sample_spread_chains()
+
+    legs = build_chain_strategy_legs("Bear Put Spread", selected, calls, puts, other_strike=5)
+
+    assert [leg["option_kind"] for leg in legs] == ["put", "put"]
+    assert [leg["strike"] for leg in legs] == [100.0, 95.0]
+    assert [leg["side"] for leg in legs] == ["long", "short"]
+
+
+def test_build_chain_strategy_legs_adds_ratio_call_spread():
+    calls, puts, selected = _sample_spread_chains()
+
+    legs = build_chain_strategy_legs("Ratio Call Spread", selected, calls, puts, other_strike=5, ratio_quantity=3)
+
+    assert [leg["option_kind"] for leg in legs] == ["call", "call"]
+    assert [leg["side"] for leg in legs] == ["long", "short"]
+    assert [leg["quantity"] for leg in legs] == [1, 3]
+
+
+def test_build_chain_strategy_legs_adds_short_iron_condor():
+    calls, puts, selected = _sample_spread_chains()
+
+    legs = build_chain_strategy_legs("Short Iron Condor", selected, calls, puts, other_strike=5)
+
+    assert [leg["option_kind"] for leg in legs] == ["put", "put", "call", "call"]
+    assert [leg["strike"] for leg in legs] == [90.0, 95.0, 105.0, 110.0]
+    assert [leg["side"] for leg in legs] == ["long", "short", "short", "long"]
+
+
 def _sample_option_chains():
     calls = pd.DataFrame(
         {

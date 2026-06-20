@@ -1,3 +1,5 @@
+"""Butterfly strategy payoff functions."""
+
 from .payoffs import call_payoff
 
 

@@ -1,3 +1,5 @@
+"""Strategy leg builders, payoff calculations, and scenario backtest utilities."""
+
 import numpy as np
 import pandas as pd
 
@@ -6,6 +8,8 @@ from Trading_Strategies.strangle import long_strangle_profit, short_strangle_pro
 
 
 def option_leg_profit(stock_prices, option_kind, side, strike, premium, quantity=1):
+    """Calculate one option leg's terminal profit over one or more stock prices."""
+
     prices = np.asarray(stock_prices, dtype=float)
     if option_kind == "call":
         payoff = np.maximum(prices - strike, 0.0)
@@ -20,6 +24,8 @@ def option_leg_profit(stock_prices, option_kind, side, strike, premium, quantity
 
 
 def strategy_profit(stock_prices, legs):
+    """Sum all option-leg profits into a full strategy payoff."""
+
     prices = np.asarray(stock_prices, dtype=float)
     total = np.zeros_like(prices, dtype=float)
     for leg in legs:
@@ -35,6 +41,8 @@ def strategy_profit(stock_prices, legs):
 
 
 def build_strategy_legs(strategy_name, spot, chain_row, other_strike=None, other_premium=None):
+    """Build simple strategy legs from one selected quote row."""
+
     strike = float(chain_row["strike"])
     premium = _market_premium(chain_row)
     option_kind = chain_row["option_kind"]
@@ -78,6 +86,8 @@ def build_strategy_legs(strategy_name, spot, chain_row, other_strike=None, other
 
 
 def _option_leg_from_row(row, option_kind, side, quantity=1):
+    """Normalize a yfinance option-chain row into the internal leg format."""
+
     return {
         "option_kind": option_kind,
         "side": side,
@@ -90,7 +100,9 @@ def _option_leg_from_row(row, option_kind, side, quantity=1):
     }
 
 
-def build_chain_strategy_legs(strategy_name, selected_row, calls, puts, other_strike=None):
+def build_chain_strategy_legs(strategy_name, selected_row, calls, puts, other_strike=None, ratio_quantity=2):
+    """Build single-leg, spread, butterfly, strangle, and condor structures."""
+
     strike = float(selected_row["strike"])
     selected_kind = selected_row["option_kind"]
 
@@ -144,10 +156,67 @@ def build_chain_strategy_legs(strategy_name, selected_row, calls, puts, other_st
             _option_leg_from_row(upper_put, "put", wing_side),
         ]
 
+    if strategy_name == "Bull Call Spread":
+        width = _spread_width(calls, strike, other_strike)
+        lower_call = _nearest_strike_row(calls, strike)
+        upper_call = _nearest_strike_row(calls, strike + width)
+        _validate_ordered_strikes([lower_call, upper_call], "Bull call spread needs a lower long call and a higher short call.")
+        return [
+            _option_leg_from_row(lower_call, "call", "long"),
+            _option_leg_from_row(upper_call, "call", "short"),
+        ]
+
+    if strategy_name == "Bear Put Spread":
+        width = _spread_width(puts, strike, other_strike)
+        upper_put = _nearest_strike_row(puts, strike)
+        lower_put = _nearest_strike_row(puts, strike - width)
+        _validate_ordered_strikes([lower_put, upper_put], "Bear put spread needs a lower short put and a higher long put.")
+        return [
+            _option_leg_from_row(upper_put, "put", "long"),
+            _option_leg_from_row(lower_put, "put", "short"),
+        ]
+
+    if strategy_name == "Ratio Call Spread":
+        width = _spread_width(calls, strike, other_strike)
+        short_quantity = max(int(ratio_quantity), 2)
+        lower_call = _nearest_strike_row(calls, strike)
+        upper_call = _nearest_strike_row(calls, strike + width)
+        _validate_ordered_strikes([lower_call, upper_call], "Ratio call spread needs a lower long call and a higher short call.")
+        return [
+            _option_leg_from_row(lower_call, "call", "long"),
+            _option_leg_from_row(upper_call, "call", "short", quantity=short_quantity),
+        ]
+
+    if strategy_name in {"Short Iron Condor", "Long Iron Condor"}:
+        width = _spread_width(calls, strike, other_strike)
+        short_put = _nearest_strike_row(puts, strike - width)
+        long_put = _nearest_strike_row(puts, strike - 2 * width)
+        short_call = _nearest_strike_row(calls, strike + width)
+        long_call = _nearest_strike_row(calls, strike + 2 * width)
+        _validate_ordered_strikes(
+            [long_put, short_put, short_call, long_call],
+            "Iron condor needs four ordered strikes around the selected strike.",
+        )
+        if strategy_name == "Short Iron Condor":
+            return [
+                _option_leg_from_row(long_put, "put", "long"),
+                _option_leg_from_row(short_put, "put", "short"),
+                _option_leg_from_row(short_call, "call", "short"),
+                _option_leg_from_row(long_call, "call", "long"),
+            ]
+        return [
+            _option_leg_from_row(long_put, "put", "short"),
+            _option_leg_from_row(short_put, "put", "long"),
+            _option_leg_from_row(short_call, "call", "long"),
+            _option_leg_from_row(long_call, "call", "short"),
+        ]
+
     raise ValueError(f"Unknown strategy: {strategy_name}")
 
 
 def _butterfly_outer_targets(calls, middle_strike, requested_width=None):
+    """Choose lower and upper strikes around the butterfly body strike."""
+
     strikes = sorted(float(strike) for strike in calls["strike"].dropna().unique())
     lower_strikes = [strike for strike in strikes if strike < middle_strike]
     upper_strikes = [strike for strike in strikes if strike > middle_strike]
@@ -163,13 +232,39 @@ def _butterfly_outer_targets(calls, middle_strike, requested_width=None):
     return middle_strike - width, middle_strike + width
 
 
+def _spread_width(chain, anchor_strike, requested_width=None):
+    """Pick the requested spread width or infer the nearest available spacing."""
+
+    strikes = sorted(float(strike) for strike in chain["strike"].dropna().unique())
+    if len(strikes) < 2:
+        raise ValueError("Spread strategies need at least two available strikes.")
+    if requested_width is not None:
+        width = abs(float(requested_width))
+        if width > 0:
+            return width
+    distances = [abs(strike - anchor_strike) for strike in strikes if strike != anchor_strike]
+    return min(distances) if distances else max(anchor_strike * 0.05, 1.0)
+
+
+def _validate_ordered_strikes(rows, message):
+    """Reject spread structures when quote data cannot provide ordered strikes."""
+
+    strikes = [float(row["strike"]) for row in rows]
+    if any(left >= right for left, right in zip(strikes, strikes[1:])):
+        raise ValueError(message)
+
+
 def _nearest_strike_row(chain, strike):
+    """Find the option-chain row closest to a target strike."""
+
     ordered = chain.copy()
     ordered["distance_from_target"] = (ordered["strike"].astype(float) - strike).abs()
     return ordered.sort_values("distance_from_target").iloc[0].to_dict()
 
 
 def _market_premium(row):
+    """Use mid price when possible and fall back to last traded price."""
+
     bid = float(row.get("bid", 0) or 0)
     ask = float(row.get("ask", 0) or 0)
     last = float(row.get("lastPrice", 0) or 0)
@@ -179,6 +274,8 @@ def _market_premium(row):
 
 
 def _quote_value(row, column):
+    """Read a positive quote value from a row, returning zero if unavailable."""
+
     try:
         value = float(row.get(column, 0) or 0)
     except (TypeError, ValueError):
@@ -187,6 +284,8 @@ def _quote_value(row, column):
 
 
 def _executable_premium(leg, slippage_per_contract=0.0):
+    """Approximate executable premium using ask for buys and bid for sells."""
+
     side = leg["side"]
     bid = float(leg.get("bid", 0) or 0)
     ask = float(leg.get("ask", 0) or 0)
@@ -202,6 +301,8 @@ def _executable_premium(leg, slippage_per_contract=0.0):
 
 
 def rank_strategy_candidates(spot, historical_volatility, selected_iv, trend_signal):
+    """Rank educational strategy candidates from IV level and trend context."""
+
     iv_ratio = selected_iv / historical_volatility if historical_volatility > 0 else np.nan
     rows = []
 
@@ -229,6 +330,8 @@ def rank_strategy_candidates(spot, historical_volatility, selected_iv, trend_sig
 
 
 def moving_average_trend(price_history, short_window=20, long_window=60):
+    """Classify a simple price trend from short and long moving averages."""
+
     close = price_history["Close"].dropna()
     if len(close) < long_window:
         return "neutral"
@@ -242,6 +345,8 @@ def moving_average_trend(price_history, short_window=20, long_window=60):
 
 
 def historical_scenario_backtest(price_history, spot, legs, holding_days=20):
+    """Apply historical holding-period returns to the current strategy payoff."""
+
     close = price_history["Close"].dropna().astype(float)
     returns = close.pct_change(holding_days).dropna()
     terminal_prices = spot * (1 + returns.to_numpy())
@@ -327,6 +432,8 @@ def rolling_strategy_backtest(
 
 
 def rank_strategies_by_backtest(strategy_results):
+    """Rank strategies from already-computed backtest metrics."""
+
     rows = []
     for strategy_name, result in strategy_results.items():
         metrics = result["metrics"]
@@ -359,6 +466,8 @@ def rank_strategies_by_backtest(strategy_results):
 
 
 def estimate_strategy_margin(legs, spot, width=0.8, contract_multiplier=1):
+    """Estimate risk capital from payoff loss, debit paid, and short-option margin."""
+
     grid = payoff_grid(spot, legs, width=width, points=401)
     worst_profit = float(grid["strategy_profit"].min()) * contract_multiplier
     net_debit = sum(
@@ -374,6 +483,8 @@ def estimate_strategy_margin(legs, spot, width=0.8, contract_multiplier=1):
 
 
 def _short_option_margin(legs, spot, contract_multiplier):
+    """Approximate short-option margin using a Reg-T style risk formula."""
+
     margin = 0.0
     for leg in legs:
         if leg["side"] != "short":
@@ -393,6 +504,8 @@ def _short_option_margin(legs, spot, contract_multiplier):
 
 
 def backtest_metrics(backtest, margin, initial_capital=100000, holding_days=1, trading_days=252):
+    """Summarize rolling strategy P&L into common backtest risk metrics."""
+
     profit = backtest["strategy_profit"].astype(float)
     if profit.empty:
         raise ValueError("backtest must contain at least one row.")
@@ -439,6 +552,8 @@ def backtest_metrics(backtest, margin, initial_capital=100000, holding_days=1, t
 
 
 def payoff_grid(spot, legs, width=0.35, points=101):
+    """Create terminal stock prices and strategy profits for payoff charts."""
+
     prices = np.linspace(spot * (1 - width), spot * (1 + width), points)
     profit = strategy_profit(prices, legs)
     return pd.DataFrame({"stock_price": prices, "strategy_profit": profit})

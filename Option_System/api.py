@@ -1,3 +1,5 @@
+"""FastAPI endpoints for pricing and Greek calculations."""
+
 from pathlib import Path
 import sys
 

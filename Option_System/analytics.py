@@ -1,3 +1,5 @@
+"""Pricing, implied-volatility, and Greek helpers used by the option app."""
+
 import math
 
 from scipy.optimize import brentq

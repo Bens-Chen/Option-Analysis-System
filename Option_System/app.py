@@ -1,3 +1,5 @@
+"""Streamlit app for live option quotes, Greeks, backtests, and risk views."""
+
 from datetime import date
 import importlib.util
 from pathlib import Path
@@ -57,6 +59,8 @@ from iv_smile import IV_smile_arrays, fit_svi_smile
 
 
 def _load_vix_svix_module():
+    """Load the extensionless VIX/SVIX module kept in Implied_Volatility."""
+
     module_path = IMPLIED_VOL_ROOT / "vix_svix"
     loader = SourceFileLoader("vix_svix_module", str(module_path))
     spec = importlib.util.spec_from_loader("vix_svix_module", loader)
@@ -103,6 +107,8 @@ def _load_market_context(
     min_volume,
     require_bid_ask,
 ):
+    """Fetch price history and the current option chain used by all app pages."""
+
     history = _cached_price_history(ticker, "5y")
     spot = latest_close(history)
     historical_vol = estimate_annualized_volatility(history)
@@ -151,6 +157,8 @@ def _load_market_context(
 
 
 def _selected_contract_analytics(context, selected_symbol, option_kind, option_style, risk_free_rate, dividend_yield):
+    """Compute pricing, IV, and Greeks for the selected option contract."""
+
     chain_table = context["chain_table"]
     selected = chain_table.loc[chain_table["contractSymbol"] == selected_symbol].iloc[0].to_dict()
     spot = context["spot"]
@@ -234,6 +242,8 @@ def _selected_contract_analytics(context, selected_symbol, option_kind, option_s
 
 
 def _render_contract_quote(context, analytics, active_ticker, option_style):
+    """Render the selected contract quote and nearby yfinance contracts."""
+
     st.subheader("Selected Contract Quote")
     quote_cols = st.columns(4)
     quote_cols[0].metric("yfinance price", f"{analytics['market_price']:.4f}")
@@ -266,6 +276,8 @@ def _render_contract_quote(context, analytics, active_ticker, option_style):
 
 
 def _render_greek_letters(context, analytics):
+    """Render single-contract Greeks plus IV smile and VIX/SVIX indicators."""
+
     st.subheader("Greek Letters")
     greeks = analytics["greeks"]
     metric_cols = st.columns(5)
@@ -322,7 +334,9 @@ def _render_greek_letters(context, analytics):
         st.warning(f"Could not build SVI IV smile for this option chain: {exc}")
 
 
-def _build_strategy_legs(strategy, selected, chain, other_strike):
+def _build_strategy_legs(strategy, selected, chain, other_strike, ratio_quantity=2):
+    """Convert the selected strategy name into option legs for payoff/backtest."""
+
     if strategy == "Custom":
         custom_text = st.text_area(
             "CSV columns: option_kind,side,strike,premium,quantity",
@@ -346,6 +360,7 @@ def _build_strategy_legs(strategy, selected, chain, other_strike):
         chain["calls"],
         chain["puts"],
         other_strike=other_strike,
+        ratio_quantity=ratio_quantity,
     )
 
 
@@ -355,7 +370,55 @@ def _format_metric(value, fmt="{:.2f}", missing="N/A"):
     return fmt.format(value)
 
 
+def _portfolio_greeks(legs, spot, risk_free_rate, dividend_yield, volatility, time_to_maturity, contract_multiplier):
+    """Aggregate leg Greeks into one strategy-level Greek exposure."""
+
+    totals = {"delta": 0.0, "gamma": 0.0, "theta_per_day": 0.0, "vega": 0.0, "rho": 0.0}
+    for leg in legs:
+        greeks = black_scholes_greeks(
+            spot,
+            float(leg["strike"]),
+            risk_free_rate,
+            dividend_yield,
+            volatility,
+            time_to_maturity,
+            leg["option_kind"],
+        )
+        side = 1 if leg["side"] == "long" else -1
+        scale = side * int(leg.get("quantity", 1)) * contract_multiplier
+        for key in totals:
+            totals[key] += float(greeks[key]) * scale
+    return totals
+
+
+def _render_portfolio_greeks(legs, context, analytics, contract_multiplier):
+    """Show portfolio Greeks beside the chosen backtest strategy."""
+
+    greeks = _portfolio_greeks(
+        legs,
+        context["spot"],
+        risk_free_rate,
+        dividend_yield,
+        analytics["model_iv"],
+        analytics["T"],
+        contract_multiplier,
+    )
+    st.subheader("Strategy Greeks")
+    greek_cols = st.columns(5)
+    greek_cols[0].metric("Delta", f"{greeks['delta']:.2f}")
+    greek_cols[1].metric("Gamma", f"{greeks['gamma']:.4f}")
+    greek_cols[2].metric("Theta/day", f"{greeks['theta_per_day']:.2f}")
+    greek_cols[3].metric("Vega", f"{greeks['vega']:.2f}")
+    greek_cols[4].metric("Rho", f"{greeks['rho']:.2f}")
+    st.caption(
+        "Strategy Greeks are the sum of each leg's Greek after long/short sign, quantity, and contract multiplier. "
+        "This uses BS Greeks with the selected contract's model IV as a portfolio approximation."
+    )
+
+
 def _backtest_diagnostics(metrics, backtest, holding_days, non_overlapping):
+    """Create short warnings when backtest metrics may be misleading."""
+
     notes = []
     if metrics["win_rate"] >= 0.70:
         notes.append("Win rate is high. Check whether the strategy is selling tail risk or benefiting from scaled current premiums.")
@@ -382,6 +445,8 @@ def _render_backtest(
     transaction_cost_per_contract,
     contract_multiplier,
 ):
+    """Render strategy construction, payoff, rolling backtest, and diagnostics."""
+
     st.subheader("Backtest")
     strategy = st.selectbox(
         "Strategy",
@@ -395,18 +460,31 @@ def _render_backtest(
             "Short Call Butterfly",
             "Long Put Butterfly",
             "Short Put Butterfly",
+            "Bull Call Spread",
+            "Bear Put Spread",
+            "Ratio Call Spread",
+            "Short Iron Condor",
+            "Long Iron Condor",
             "Custom",
         ],
     )
+    ratio_quantity = 2
     if "Butterfly" in strategy:
         other_strike = st.number_input("Butterfly wing width", value=max(float(analytics["selected"]["strike"]) * 0.05, 1.0))
     elif "Strangle" in strategy:
         other_strike = st.number_input("Second strike for strangle", value=float(analytics["selected"]["strike"]) * 1.05)
+    elif "Iron Condor" in strategy:
+        other_strike = st.number_input("Condor wing width", value=max(float(analytics["selected"]["strike"]) * 0.05, 1.0))
+    elif "Spread" in strategy:
+        other_strike = st.number_input("Spread width", value=max(float(analytics["selected"]["strike"]) * 0.05, 1.0))
+        if strategy == "Ratio Call Spread":
+            ratio_quantity = st.number_input("Short call quantity", value=2, min_value=2, step=1)
     else:
         other_strike = None
 
-    legs = _build_strategy_legs(strategy, analytics["selected"], context["chain"], other_strike)
+    legs = _build_strategy_legs(strategy, analytics["selected"], context["chain"], other_strike, ratio_quantity=ratio_quantity)
     st.dataframe(pd.DataFrame(legs), use_container_width=True)
+    _render_portfolio_greeks(legs, context, analytics, contract_multiplier)
 
     grid = payoff_grid(context["spot"], legs)
     backtest = rolling_strategy_backtest(
@@ -482,6 +560,8 @@ def _render_backtest(
 
 
 def _live_vol_curve_nodes(context):
+    """Build OTM IV nodes from the live option chain for the vol curve monitor."""
+
     rows = []
     forward = context["spot"]
     for option_kind, table in [("call", context["calls_with_mid"]), ("put", context["puts_with_mid"])]:
@@ -508,6 +588,8 @@ def _live_vol_curve_nodes(context):
 
 
 def _historical_price_shocks(history, holding_days):
+    """Use historical holding-period moves to pick symmetric risk shocks."""
+
     close = history["Close"].dropna().astype(float)
     returns = close.pct_change(int(holding_days)).dropna()
     if len(returns) < 20:
@@ -519,6 +601,8 @@ def _historical_price_shocks(history, holding_days):
 
 
 def _render_risk_management(context, analytics):
+    """Render scenario risk matrix, VaR/ES, and volatility curve monitor."""
+
     st.subheader("Risk Management")
     selected = analytics["selected"]
     risk_legs = [

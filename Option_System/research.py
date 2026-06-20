@@ -1,3 +1,5 @@
+"""Research-oriented option-chain analytics and strategy diagnostic helpers."""
+
 from datetime import date
 
 import numpy as np

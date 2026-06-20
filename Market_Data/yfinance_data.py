@@ -1,3 +1,5 @@
+"""Market-data helpers for yfinance price history and current option chains."""
+
 import math
 
 import numpy as np

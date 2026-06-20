@@ -1,3 +1,5 @@
+"""Vertical and ratio spread payoff functions."""
+
 from .payoffs import call_payoff, put_payoff
 
 

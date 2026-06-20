@@ -1,3 +1,5 @@
+"""Iron condor strategy payoff functions."""
+
 from .payoffs import call_payoff, put_payoff
 
 

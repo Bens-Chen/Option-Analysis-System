@@ -1,3 +1,5 @@
+"""Scenario risk matrix construction and plotting for option portfolios."""
+
 from dataclasses import dataclass
 
 import matplotlib.pyplot as plt

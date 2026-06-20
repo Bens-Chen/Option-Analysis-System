@@ -1,3 +1,5 @@
+"""Example script for running the Monte Carlo pricing function."""
+
 from pathlib import Path
 import sys
 

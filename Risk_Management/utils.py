@@ -1,3 +1,5 @@
+"""Small formatting and styling helpers shared by risk-management charts."""
+
 import numpy as np
 
 

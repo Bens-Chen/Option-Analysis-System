@@ -1,3 +1,5 @@
+"""Lookback option pricing by path simulation."""
+
 import math
 import numpy as np
 
