@@ -98,9 +98,6 @@ High gamma is attractive, but it usually comes with faster time decay.
 
 ## CRR Greeks
 
-`CRR` estimates Delta, Gamma, and Theta from CRR tree nodes.
-
-
 Here introduce two CRR methods:
 
 - one-tree Greek estimation
@@ -118,8 +115,6 @@ The Pelsser and Vorst extended tree improves the node layout for Greek estimatio
 
 
 ## Monte Carlo Greeks
-
-`Monte-Carlo` implements:
 
 - pathwise method
 - likelihood ratio method
