@@ -77,28 +77,33 @@ def build_strategy_legs(strategy_name, spot, chain_row, other_strike=None, other
     raise ValueError(f"Unknown strategy: {strategy_name}")
 
 
+def _option_leg_from_row(row, option_kind, side, quantity=1):
+    return {
+        "option_kind": option_kind,
+        "side": side,
+        "strike": float(row["strike"]),
+        "premium": _market_premium(row),
+        "bid": _quote_value(row, "bid"),
+        "ask": _quote_value(row, "ask"),
+        "lastPrice": _quote_value(row, "lastPrice"),
+        "quantity": int(quantity),
+    }
+
+
 def build_chain_strategy_legs(strategy_name, selected_row, calls, puts, other_strike=None):
     strike = float(selected_row["strike"])
     selected_kind = selected_row["option_kind"]
 
     if strategy_name == "Single Option":
-        return [
-            {
-                "option_kind": selected_kind,
-                "side": "long",
-                "strike": strike,
-                "premium": _market_premium(selected_row),
-                "quantity": 1,
-            }
-        ]
+        return [_option_leg_from_row(selected_row, selected_kind, "long")]
 
     if strategy_name in {"Long Straddle", "Short Straddle"}:
         side = "long" if strategy_name == "Long Straddle" else "short"
         call_row = _nearest_strike_row(calls, strike)
         put_row = _nearest_strike_row(puts, strike)
         return [
-            {"option_kind": "call", "side": side, "strike": float(call_row["strike"]), "premium": _market_premium(call_row), "quantity": 1},
-            {"option_kind": "put", "side": side, "strike": float(put_row["strike"]), "premium": _market_premium(put_row), "quantity": 1},
+            _option_leg_from_row(call_row, "call", side),
+            _option_leg_from_row(put_row, "put", side),
         ]
 
     if strategy_name in {"Long Strangle", "Short Strangle"}:
@@ -109,8 +114,8 @@ def build_chain_strategy_legs(strategy_name, selected_row, calls, puts, other_st
         call_row = _nearest_strike_row(calls, call_strike)
         put_row = _nearest_strike_row(puts, put_strike)
         return [
-            {"option_kind": "put", "side": side, "strike": float(put_row["strike"]), "premium": _market_premium(put_row), "quantity": 1},
-            {"option_kind": "call", "side": side, "strike": float(call_row["strike"]), "premium": _market_premium(call_row), "quantity": 1},
+            _option_leg_from_row(put_row, "put", side),
+            _option_leg_from_row(call_row, "call", side),
         ]
 
     if strategy_name in {"Long Call Butterfly", "Short Call Butterfly"}:
@@ -121,9 +126,9 @@ def build_chain_strategy_legs(strategy_name, selected_row, calls, puts, other_st
         middle_side = "short" if strategy_name == "Long Call Butterfly" else "long"
         wing_side = "long" if strategy_name == "Long Call Butterfly" else "short"
         return [
-            {"option_kind": "call", "side": wing_side, "strike": float(lower_call["strike"]), "premium": _market_premium(lower_call), "quantity": 1},
-            {"option_kind": "call", "side": middle_side, "strike": float(middle_call["strike"]), "premium": _market_premium(middle_call), "quantity": 2},
-            {"option_kind": "call", "side": wing_side, "strike": float(upper_call["strike"]), "premium": _market_premium(upper_call), "quantity": 1},
+            _option_leg_from_row(lower_call, "call", wing_side),
+            _option_leg_from_row(middle_call, "call", middle_side, quantity=2),
+            _option_leg_from_row(upper_call, "call", wing_side),
         ]
 
     if strategy_name in {"Long Put Butterfly", "Short Put Butterfly"}:
@@ -134,9 +139,9 @@ def build_chain_strategy_legs(strategy_name, selected_row, calls, puts, other_st
         middle_side = "short" if strategy_name == "Long Put Butterfly" else "long"
         wing_side = "long" if strategy_name == "Long Put Butterfly" else "short"
         return [
-            {"option_kind": "put", "side": wing_side, "strike": float(lower_put["strike"]), "premium": _market_premium(lower_put), "quantity": 1},
-            {"option_kind": "put", "side": middle_side, "strike": float(middle_put["strike"]), "premium": _market_premium(middle_put), "quantity": 2},
-            {"option_kind": "put", "side": wing_side, "strike": float(upper_put["strike"]), "premium": _market_premium(upper_put), "quantity": 1},
+            _option_leg_from_row(lower_put, "put", wing_side),
+            _option_leg_from_row(middle_put, "put", middle_side, quantity=2),
+            _option_leg_from_row(upper_put, "put", wing_side),
         ]
 
     raise ValueError(f"Unknown strategy: {strategy_name}")
@@ -171,6 +176,29 @@ def _market_premium(row):
     if bid > 0 and ask > 0:
         return (bid + ask) / 2
     return last
+
+
+def _quote_value(row, column):
+    try:
+        value = float(row.get(column, 0) or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    return value if np.isfinite(value) and value > 0 else 0.0
+
+
+def _executable_premium(leg, slippage_per_contract=0.0):
+    side = leg["side"]
+    bid = float(leg.get("bid", 0) or 0)
+    ask = float(leg.get("ask", 0) or 0)
+    mid = float(leg.get("premium", 0) or 0)
+    slippage = max(float(slippage_per_contract), 0.0)
+    if side == "long":
+        base = ask if ask > 0 else mid
+        return max(base + slippage, 0.0)
+    if side == "short":
+        base = bid if bid > 0 else mid
+        return max(base - slippage, 0.0)
+    raise ValueError("side must be 'long' or 'short'.")
 
 
 def rank_strategy_candidates(spot, historical_volatility, selected_iv, trend_signal):
@@ -229,7 +257,16 @@ def historical_scenario_backtest(price_history, spot, legs, holding_days=20):
     )
 
 
-def rolling_strategy_backtest(price_history, current_spot, legs, holding_days=1):
+def rolling_strategy_backtest(
+    price_history,
+    current_spot,
+    legs,
+    holding_days=1,
+    non_overlapping=True,
+    slippage_per_contract=0.0,
+    transaction_cost_per_contract=0.65,
+    contract_multiplier=1,
+):
     """Re-enter the same relative option structure through history.
 
     yfinance does not provide historical option chains here, so each leg is
@@ -241,9 +278,15 @@ def rolling_strategy_backtest(price_history, current_spot, legs, holding_days=1)
         raise ValueError("holding_days must be at least 1.")
     if len(close) <= holding_days:
         raise ValueError("Not enough price history for rolling backtest.")
+    if current_spot <= 0:
+        raise ValueError("current_spot must be positive.")
+    if contract_multiplier <= 0:
+        raise ValueError("contract_multiplier must be positive.")
 
     rows = []
-    for i in range(len(close) - holding_days):
+    step = holding_days if non_overlapping else 1
+    round_trip_cost = 2 * max(float(transaction_cost_per_contract), 0.0)
+    for i in range(0, len(close) - holding_days, step):
         entry_date = close.index[i]
         exit_date = close.index[i + holding_days]
         entry_spot = float(close.iloc[i])
@@ -256,13 +299,16 @@ def rolling_strategy_backtest(price_history, current_spot, legs, holding_days=1)
                     "option_kind": leg["option_kind"],
                     "side": leg["side"],
                     "strike": entry_spot * float(leg["strike"]) / current_spot,
-                    "premium": entry_spot * float(leg["premium"]) / current_spot,
+                    "premium": entry_spot * _executable_premium(leg, slippage_per_contract) / current_spot,
                     "quantity": int(leg.get("quantity", 1)),
                 }
             )
 
-        profit = float(strategy_profit([terminal_price], rolling_legs)[0])
-        margin = estimate_strategy_margin(rolling_legs, entry_spot)
+        gross_profit = float(strategy_profit([terminal_price], rolling_legs)[0]) * contract_multiplier
+        contracts = sum(abs(int(leg.get("quantity", 1))) for leg in rolling_legs)
+        transaction_cost = round_trip_cost * contracts
+        profit = gross_profit - transaction_cost
+        margin = estimate_strategy_margin(rolling_legs, entry_spot, contract_multiplier=contract_multiplier)
         rows.append(
             {
                 "entry_date": entry_date,
@@ -270,6 +316,8 @@ def rolling_strategy_backtest(price_history, current_spot, legs, holding_days=1)
                 "entry_spot": entry_spot,
                 "terminal_price": terminal_price,
                 "historical_return": terminal_price / entry_spot - 1,
+                "gross_profit": gross_profit,
+                "transaction_cost": transaction_cost,
                 "strategy_profit": profit,
                 "margin_estimate": margin,
             }
@@ -310,31 +358,64 @@ def rank_strategies_by_backtest(strategy_results):
     return pd.DataFrame(rows).sort_values("score", ascending=False)
 
 
-def estimate_strategy_margin(legs, spot, width=0.8):
+def estimate_strategy_margin(legs, spot, width=0.8, contract_multiplier=1):
     grid = payoff_grid(spot, legs, width=width, points=401)
-    worst_profit = float(grid["strategy_profit"].min())
+    worst_profit = float(grid["strategy_profit"].min()) * contract_multiplier
     net_debit = sum(
         (1 if leg["side"] == "long" else -1)
         * float(leg["premium"])
         * int(leg.get("quantity", 1))
         for leg in legs
-    )
+    ) * contract_multiplier
     debit_margin = max(net_debit, 0.0)
     loss_margin = max(-worst_profit, 0.0)
-    return max(debit_margin, loss_margin)
+    short_margin = _short_option_margin(legs, spot, contract_multiplier)
+    return max(debit_margin, loss_margin, short_margin)
 
 
-def backtest_metrics(backtest, margin):
+def _short_option_margin(legs, spot, contract_multiplier):
+    margin = 0.0
+    for leg in legs:
+        if leg["side"] != "short":
+            continue
+        strike = float(leg["strike"])
+        premium = float(leg["premium"])
+        quantity = abs(int(leg.get("quantity", 1)))
+        if leg["option_kind"] == "call":
+            out_of_money = max(strike - spot, 0.0)
+        elif leg["option_kind"] == "put":
+            out_of_money = max(spot - strike, 0.0)
+        else:
+            continue
+        risk_based = premium + max(0.20 * spot - out_of_money, 0.10 * spot)
+        margin += risk_based * quantity * contract_multiplier
+    return margin
+
+
+def backtest_metrics(backtest, margin, initial_capital=100000, holding_days=1, trading_days=252):
     profit = backtest["strategy_profit"].astype(float)
+    if profit.empty:
+        raise ValueError("backtest must contain at least one row.")
+    if initial_capital <= 0:
+        raise ValueError("initial_capital must be positive.")
+    if holding_days <= 0:
+        raise ValueError("holding_days must be positive.")
+
     cumulative_profit = profit.cumsum()
-    running_peak = cumulative_profit.cummax()
-    drawdown = cumulative_profit - running_peak
+    equity = initial_capital + cumulative_profit
+    running_peak = equity.cummax()
+    drawdown = equity - running_peak
     max_drawdown = float(drawdown.min())
 
-    profit_std = float(profit.std(ddof=1))
+    returns = profit / initial_capital
+    returns_std = float(returns.std(ddof=1))
     sharpe_ratio = np.nan
-    if profit_std > 0:
-        sharpe_ratio = float(profit.mean() / profit_std)
+    periods_per_year = trading_days / holding_days
+    if returns_std > 0:
+        sharpe_ratio = float(returns.mean() / returns_std * np.sqrt(periods_per_year))
+    var_95 = float(-returns.quantile(0.05))
+    tail_returns = returns[returns <= returns.quantile(0.05)]
+    expected_shortfall_95 = float(-tail_returns.mean()) if not tail_returns.empty else np.nan
 
     return {
         "avg_pnl": float(profit.mean()),
@@ -342,10 +423,16 @@ def backtest_metrics(backtest, margin):
         "win_rate": float((profit > 0).mean()),
         "sharpe_ratio": sharpe_ratio,
         "mdd": max_drawdown,
+        "mdd_pct": float(max_drawdown / initial_capital),
         "best_scenario": float(profit.max()),
         "worst_scenario": float(profit.min()),
         "margin_estimate": float(margin),
         "return_on_margin": float(profit.mean() / margin) if margin > 0 else np.nan,
+        "return_on_capital": float(profit.sum() / initial_capital),
+        "var_95": var_95,
+        "expected_shortfall_95": expected_shortfall_95,
+        "ending_equity": float(equity.iloc[-1]),
+        "initial_capital": float(initial_capital),
     }
 
 

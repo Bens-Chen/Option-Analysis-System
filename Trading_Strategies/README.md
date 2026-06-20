@@ -102,8 +102,6 @@ Short strangle:
 
 ## Iron Condor
 
-`iron_condor.py` implements long and short iron condor payoff logic.
-
 The common short iron condor is a range-bound income strategy:
 
 - Buy one far OTM put at $K_1$.
@@ -117,7 +115,5 @@ terminal stock price stays between the two short strikes $K_2$ and $K_3$.
 Risk is limited because the far put and far call cap the tail losses.
 
 
-Use `long_iron_condor_profit` for the opposite payoff. A long iron condor pays
-premium and benefits when the stock moves outside the middle range.
 
 

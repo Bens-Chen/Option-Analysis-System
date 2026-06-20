@@ -10,6 +10,7 @@ from Risk_Management.risk_visuals import (
     historical_expected_shortfall,
     historical_var,
     historical_var_es_summary,
+    ewma_var_es_summary,
     parametric_var,
     plot_risk_matrix,
     plot_vol_curve_monitor,
@@ -69,3 +70,15 @@ def test_parametric_var_uses_positive_volatility():
     var = parametric_var(annualized_volatility=0.2, confidence_level=0.95, portfolio_value=100000)
 
     assert var > 0
+
+
+def test_ewma_var_es_summary_returns_tail_metrics():
+    summary = ewma_var_es_summary(
+        [-0.05, -0.03, -0.01, 0.0, 0.02, -0.02, 0.01],
+        confidence_level=0.8,
+        portfolio_value=100000,
+    )
+
+    assert summary["var"] > 0
+    assert summary["expected_shortfall"] > 0
+    assert summary["tail_observations"] >= 1

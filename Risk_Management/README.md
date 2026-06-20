@@ -2,20 +2,6 @@
 
 This folder contains notes and chart utilities for option-trading risk management.
 
-The demo uses synthetic data. For real analysis, replace the demo DataFrames
-with yfinance option-chain data, saved volatility nodes, or your own portfolio
-return series.
-
-The code is split by method:
-
-```text
-var_es.py              VaR and Expected Shortfall
-risk_matrix.py         P&L and Greeks scenario matrix
-vol_curve_monitor.py   volatility curve, curvature, and expiry comparison
-vol_tracker.py         intraday volatility and underlying tracker
-risk_visuals.py        compatibility entrypoint and demo launcher
-```
-
 ## VaR & Expected Shortfall
 
 VaR estimates the loss threshold at a chosen confidence level. For example,

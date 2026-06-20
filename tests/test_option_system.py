@@ -16,6 +16,7 @@ from Option_System.strategy_engine import (
     build_chain_strategy_legs,
     estimate_strategy_margin,
     historical_scenario_backtest,
+    rolling_strategy_backtest,
     strategy_profit,
 )
 
@@ -65,6 +66,47 @@ def test_backtest_metrics_includes_sharpe_mdd_and_margin():
 
     assert {"sharpe_ratio", "mdd", "margin_estimate", "return_on_margin"} <= set(metrics)
     assert metrics["margin_estimate"] > 0
+
+
+def test_rolling_backtest_uses_non_overlapping_trades_and_costs():
+    history = pd.DataFrame({"Close": [100, 102, 104, 101, 103, 106, 108]})
+    legs = [
+        {
+            "option_kind": "call",
+            "side": "long",
+            "strike": 100,
+            "premium": 3,
+            "bid": 2.8,
+            "ask": 3.2,
+            "lastPrice": 3,
+            "quantity": 1,
+        }
+    ]
+
+    result = rolling_strategy_backtest(
+        history,
+        current_spot=100,
+        legs=legs,
+        holding_days=2,
+        non_overlapping=True,
+        slippage_per_contract=0.1,
+        transaction_cost_per_contract=0.5,
+        contract_multiplier=100,
+    )
+
+    assert len(result) == 3
+    assert {"gross_profit", "transaction_cost", "margin_estimate"} <= set(result.columns)
+    assert (result["transaction_cost"] == 1.0).all()
+
+
+def test_backtest_metrics_uses_initial_capital_returns():
+    backtest = pd.DataFrame({"strategy_profit": [100.0, -50.0, 150.0]})
+
+    metrics = backtest_metrics(backtest, margin=500, initial_capital=10000, holding_days=5)
+
+    assert metrics["return_on_capital"] == pytest.approx(0.02)
+    assert metrics["ending_equity"] == pytest.approx(10200)
+    assert {"mdd_pct", "var_95", "expected_shortfall_95"} <= set(metrics)
 
 
 def test_crr_greeks_supports_american_option_style():

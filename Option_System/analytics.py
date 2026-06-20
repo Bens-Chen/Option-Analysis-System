@@ -51,20 +51,7 @@ def option_price_from_bs(S, K, r, q, sigma, T, option_kind):
     return call if option_kind == "call" else put
 
 
-def implied_volatility_from_price(
-    market_price,
-    S,
-    K,
-    r,
-    q,
-    T,
-    option_kind,
-    pricing_model="BS",
-    option_style="European",
-    steps=200,
-    lower=1e-4,
-    upper=5.0,
-):
+def implied_volatility_from_price(market_price,S,K,r,q,T,option_kind,pricing_model="BS",option_style="European",steps=200,lower=1e-4, upper=5.0):
     if market_price <= 0:
         raise ValueError("market_price must be positive.")
 
@@ -86,21 +73,7 @@ def crr_option_price(S, K, r, q, sigma, T, option_kind, option_style="American",
     return call if option_kind == "call" else put
 
 
-def crr_greeks_by_bump(
-    S,
-    K,
-    r,
-    q,
-    sigma,
-    T,
-    option_kind,
-    option_style="American",
-    steps=200,
-    spot_bump=0.01,
-    vol_bump=0.01,
-    rate_bump=0.0001,
-    time_bump_days=1,
-):
+def crr_greeks_by_bump(S,K,r, q,sigma,T,option_kind,option_style="American",steps=200,spot_bump=0.01,vol_bump=0.01,rate_bump=0.0001, time_bump_days=1):
     if sigma <= 0 or T <= 0:
         raise ValueError("sigma and T must be positive.")
 

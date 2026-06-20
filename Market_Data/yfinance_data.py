@@ -53,13 +53,43 @@ def latest_close(price_history, column="Close"):
     return float(close.iloc[-1])
 
 
-def estimate_annualized_volatility(price_history, column="Close", trading_days=252):
+def _newey_west_lag_count(sample_size):
+    if sample_size < 2:
+        raise ValueError("At least two returns are required to estimate volatility.")
+    return max(1, int(math.floor(4 * (sample_size / 100) ** (2 / 9))))
+
+
+def _newey_west_long_run_variance(values, lags):
+    returns = np.asarray(values, dtype=float)
+    returns = returns[np.isfinite(returns)]
+    if returns.size < 2:
+        raise ValueError("At least two finite returns are required to estimate volatility.")
+
+    centered = returns - returns.mean()
+    lags = min(int(lags), returns.size - 1)
+    if lags < 0:
+        raise ValueError("lags must be non-negative.")
+
+    variance = float(np.mean(centered * centered))
+    for lag in range(1, lags + 1):
+        autocovariance = float(np.mean(centered[lag:] * centered[:-lag]))
+        bartlett_weight = 1 - lag / (lags + 1)
+        variance += 2 * bartlett_weight * autocovariance
+
+    return variance
+
+
+def estimate_annualized_volatility(price_history, column="Close", trading_days=252, lags=None):
     close = price_history[column].dropna().astype(float)
     if len(close) < 3:
         raise ValueError("At least three close prices are required to estimate volatility.")
 
     log_returns = np.log(close / close.shift(1)).dropna()
-    volatility = float(log_returns.std(ddof=1) * math.sqrt(trading_days))
+    selected_lags = _newey_west_lag_count(len(log_returns)) if lags is None else int(lags)
+    long_run_variance = _newey_west_long_run_variance(log_returns.to_numpy(), selected_lags)
+    if not math.isfinite(long_run_variance) or long_run_variance <= 0:
+        raise ValueError("Estimated Newey-West long-run variance must be positive.")
+    volatility = float(math.sqrt(long_run_variance * trading_days))
     if not math.isfinite(volatility) or volatility <= 0:
         raise ValueError("Estimated volatility must be positive.")
     return volatility
@@ -112,19 +142,7 @@ def add_mid_prices(option_table):
     return table
 
 
-def filter_option_chain_by_quality(
-    option_table,
-    max_spread_pct=0.50,
-    min_open_interest=0,
-    min_volume=0,
-    require_bid_ask=False,
-):
-    """Keep option rows with usable prices and simple liquidity checks.
-
-    yfinance option chains can be sparse. The defaults are intentionally light:
-    rows with a valid last price can survive even when bid/ask are missing.
-    Set require_bid_ask=True when the analysis needs firmer executable quotes.
-    """
+def filter_option_chain_by_quality(option_table,max_spread_pct=0.50,min_open_interest=0,min_volume=0,require_bid_ask=False):
     table = add_mid_prices(option_table)
     if table.empty:
         return table

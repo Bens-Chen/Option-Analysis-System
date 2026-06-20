@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def load_vix_svix_module():
-    module_path = Path(__file__).resolve().parents[1] / "Implied_Volatility" / "VIX,SVIX"
+    module_path = Path(__file__).resolve().parents[1] / "Implied_Volatility" / "vix_svix"
     loader = SourceFileLoader("test_vix_svix_module", str(module_path))
     spec = importlib.util.spec_from_loader("test_vix_svix_module", loader)
     module = importlib.util.module_from_spec(spec)

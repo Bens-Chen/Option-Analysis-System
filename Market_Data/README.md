@@ -29,4 +29,4 @@ The filter is intentionally simple. It does not claim a quote is tradable; it on
 
 `yfinance` does not provide a complete historical option-chain database for this project. Because of that, the option-system backtest does not reconstruct old option chains or old IV surfaces.
 
-The backtest replays the current relative option structure through historical underlying prices. This is useful for learning payoff behavior, but it should not be read as a production-grade historical option backtest.
+The backtest replays the current relative option structure through historical underlying prices. 

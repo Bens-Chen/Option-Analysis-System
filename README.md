@@ -47,40 +47,28 @@ pytest
 ## Project Structure
 
 ```text
+Exotic_Options/
+  README.md                  # exotic option notes
+  asian_option.py
+  barrier_option.py
+  binary_option.py
+  rainbow_option.py
+  lookback_option.py
+
+Greak_Letters/
+  README.md                  # Greeks and hedging notes
+  crr_greak
+  monte_carlo_greek
+
 Implied_Volatility/
   README.md                  # implied volatility, IV smile, VIX, and SVIX notes
   constant_IV.py
   iv_smile.py
-  VIX,SVIX
-
-Exotic_Options/
-  README.md                  # Asian, Lookback, and Rainbow option notes
-  asian_option.py
-  lookback_option.py
-  rainbow_option.py
-
-Greak_Letters/
-  README.md                  # Greeks and hedging notes
-  CRR                        # CRR Greek calculations
-  Monte-Carlo                # pathwise and likelihood Monte Carlo Greeks
+  vix_svix
 
 Market_Data/
   README.md                  # yfinance data connection notes
   yfinance_data.py
-
-Option_System/
-  README.md                  # interactive option search and strategy system
-  analytics.py
-  strategy_engine.py
-  app.py
-
-Trading_Strategies/
-  README.md                  # interval, butterfly, straddle, strangle
-  butterfly.py
-  interval_trading.py
-  payoffs.py
-  straddle.py
-  strangle.py
 
 Methods/
   README.md                  # core pricing method notes
@@ -88,6 +76,33 @@ Methods/
   crr.py
   finite_difference.py
   monte_carlo.py
+
+Option_System/
+  README.md                  # interactive option search and strategy system
+  api.py
+  analytics.py
+  app.py
+  research.py
+  strategy_engine.py
+
+Risk_Management/
+  README.md                  # risk metrics, volatility tracking, and visuals
+  risk_matrix.py
+  risk_visuals.py
+  utils.py
+  var_es.py
+  vol_curve_monitor.py
+  vol_tracker.py
+
+Trading_Strategies/
+  README.md                  # interval, butterfly, straddle, strangle, and spreads
+  butterfly.py
+  iron_condor.py
+  interval_trading.py
+  payoffs.py
+  spread.py
+  straddle.py
+  strangle.py
 
 examples/
   black_scholes_example.py
@@ -98,7 +113,13 @@ examples/
 tests/
   test_black_scholes.py
   test_crr.py
+  test_exotic_options.py
+  test_iv_smile.py
+  test_option_api.py
   test_option_system.py
+  test_risk_management.py
+  test_trading_strategies.py
+  test_vix_svix.py
   test_yfinance_data.py
 ```
 

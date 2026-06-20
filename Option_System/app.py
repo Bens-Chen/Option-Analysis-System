@@ -37,9 +37,7 @@ from Option_System.strategy_engine import (
     backtest_metrics,
     build_chain_strategy_legs,
     estimate_strategy_margin,
-    moving_average_trend,
     payoff_grid,
-    rank_strategies_by_backtest,
     rolling_strategy_backtest,
 )
 from Option_System.research import (
@@ -53,15 +51,13 @@ from Option_System.research import (
     volatility_surface_table,
 )
 from Risk_Management.risk_matrix import OptionLeg, build_risk_matrix, plot_risk_matrix
-from Risk_Management.var_es import historical_var_es_summary
-from Risk_Management.vol_curve_monitor import build_demo_vol_curves, plot_vol_curve_monitor
+from Risk_Management.var_es import ewma_var_es_summary, historical_var_es_summary
+from Risk_Management.vol_curve_monitor import plot_vol_curve_monitor
 from iv_smile import IV_smile_arrays, fit_svi_smile
 
 
 def _load_vix_svix_module():
-    module_path = IMPLIED_VOL_ROOT / "VIX,SVIX"
-    if not module_path.exists():
-        module_path = IMPLIED_VOL_ROOT / "vix_svix"
+    module_path = IMPLIED_VOL_ROOT / "vix_svix"
     loader = SourceFileLoader("vix_svix_module", str(module_path))
     spec = importlib.util.spec_from_loader("vix_svix_module", loader)
     module = importlib.util.module_from_spec(spec)
@@ -353,7 +349,39 @@ def _build_strategy_legs(strategy, selected, chain, other_strike):
     )
 
 
-def _render_backtest(context, analytics, holding_days):
+def _format_metric(value, fmt="{:.2f}", missing="N/A"):
+    if pd.isna(value):
+        return missing
+    return fmt.format(value)
+
+
+def _backtest_diagnostics(metrics, backtest, holding_days, non_overlapping):
+    notes = []
+    if metrics["win_rate"] >= 0.70:
+        notes.append("Win rate is high. Check whether the strategy is selling tail risk or benefiting from scaled current premiums.")
+    if metrics["win_rate"] <= 0.40:
+        notes.append("Win rate is low. The payoff may need larger underlying moves or better strike selection.")
+    if metrics["return_on_capital"] > 0.20:
+        notes.append("Return on capital is unusually high. Validate transaction costs, bid/ask execution, and the scenario-backtest assumption.")
+    if metrics["expected_shortfall_95"] > abs(metrics["var_95"]) * 1.5:
+        notes.append("Expected shortfall is much larger than VaR, so losses are concentrated in the worst scenarios.")
+    if not non_overlapping and holding_days > 1:
+        notes.append("Holding-period samples overlap, so Sharpe and win rate can look smoother than independent trades.")
+    if backtest["transaction_cost"].sum() > abs(backtest["gross_profit"].sum()) * 0.25:
+        notes.append("Transaction costs are a large share of gross P&L. Liquidity and spread assumptions are driving results.")
+    return notes
+
+
+def _render_backtest(
+    context,
+    analytics,
+    holding_days,
+    initial_capital,
+    non_overlapping,
+    slippage_per_contract,
+    transaction_cost_per_contract,
+    contract_multiplier,
+):
     st.subheader("Backtest")
     strategy = st.selectbox(
         "Strategy",
@@ -381,16 +409,36 @@ def _render_backtest(context, analytics, holding_days):
     st.dataframe(pd.DataFrame(legs), use_container_width=True)
 
     grid = payoff_grid(context["spot"], legs)
-    backtest = rolling_strategy_backtest(context["history"], context["spot"], legs, holding_days=int(holding_days))
-    margin = estimate_strategy_margin(legs, context["spot"])
-    metrics = backtest_metrics(backtest, margin)
+    backtest = rolling_strategy_backtest(
+        context["history"],
+        context["spot"],
+        legs,
+        holding_days=int(holding_days),
+        non_overlapping=non_overlapping,
+        slippage_per_contract=slippage_per_contract,
+        transaction_cost_per_contract=transaction_cost_per_contract,
+        contract_multiplier=contract_multiplier,
+    )
+    margin = estimate_strategy_margin(legs, context["spot"], contract_multiplier=contract_multiplier)
+    metrics = backtest_metrics(
+        backtest,
+        margin,
+        initial_capital=initial_capital,
+        holding_days=int(holding_days),
+    )
 
-    summary_cols = st.columns(5)
+    summary_cols = st.columns(6)
     summary_cols[0].metric("Avg PnL", f"{metrics['avg_pnl']:.2f}")
-    summary_cols[1].metric("Win rate", f"{metrics['win_rate']:.2%}")
-    summary_cols[2].metric("Sharpe ratio", f"{metrics['sharpe_ratio']:.2f}")
-    summary_cols[3].metric("MDD", f"{metrics['mdd']:.2f}")
-    summary_cols[4].metric("Margin est.", f"{metrics['margin_estimate']:.2f}")
+    summary_cols[1].metric("Total PnL", f"{metrics['total_pnl']:.2f}")
+    summary_cols[2].metric("Win rate", f"{metrics['win_rate']:.2%}")
+    summary_cols[3].metric("Sharpe", _format_metric(metrics["sharpe_ratio"]))
+    summary_cols[4].metric("MDD", f"{metrics['mdd']:.2f}", f"{metrics['mdd_pct']:.2%}")
+    summary_cols[5].metric("Return on capital", f"{metrics['return_on_capital']:.2%}")
+    risk_cols = st.columns(4)
+    risk_cols[0].metric("Ending equity", f"{metrics['ending_equity']:.2f}")
+    risk_cols[1].metric("Margin est.", f"{metrics['margin_estimate']:.2f}")
+    risk_cols[2].metric("VaR 95%", f"{metrics['var_95']:.2%}")
+    risk_cols[3].metric("ES 95%", f"{metrics['expected_shortfall_95']:.2%}")
 
     plot_left, plot_right = st.columns(2)
     with plot_left:
@@ -407,8 +455,14 @@ def _render_backtest(context, analytics, holding_days):
         fig, ax = plt.subplots()
         backtest_plot = backtest.copy()
         backtest_plot["cumulative_pnl"] = backtest_plot["strategy_profit"].cumsum()
-        ax.plot(backtest_plot.index, backtest_plot["strategy_profit"], label="Period PnL", linewidth=1)
+        backtest_plot["equity"] = initial_capital + backtest_plot["cumulative_pnl"]
+        ax.plot(backtest_plot.index, backtest_plot["strategy_profit"], label="Trade PnL", linewidth=1)
         ax.plot(backtest_plot.index, backtest_plot["cumulative_pnl"], label="Cumulative PnL", linewidth=2)
+        ax.plot(backtest_plot.index, backtest_plot["equity"], label="Equity", linewidth=1.8, alpha=0.75)
+        worst_idx = backtest_plot["strategy_profit"].idxmin()
+        best_idx = backtest_plot["strategy_profit"].idxmax()
+        ax.scatter([worst_idx], [backtest_plot.loc[worst_idx, "strategy_profit"]], color="#c0392b", zorder=4, label="Worst trade")
+        ax.scatter([best_idx], [backtest_plot.loc[best_idx, "strategy_profit"]], color="#1e8449", zorder=4, label="Best trade")
         ax.axhline(0, color="black", linewidth=1)
         ax.set_xlabel("Exit date")
         ax.set_ylabel("PnL")
@@ -416,7 +470,51 @@ def _render_backtest(context, analytics, holding_days):
         ax.legend()
         st.pyplot(fig)
 
+    notes = _backtest_diagnostics(metrics, backtest_plot, int(holding_days), non_overlapping)
+    if notes:
+        st.subheader("Backtest Diagnostics")
+        for note in notes:
+            st.write(f"- {note}")
+    st.caption(
+        "Scenario backtest: yfinance does not provide historical option chains here, so the selected current option structure is rescaled through historical underlying prices."
+    )
     st.dataframe(backtest_plot.tail(30), use_container_width=True)
+
+
+def _live_vol_curve_nodes(context):
+    rows = []
+    forward = context["spot"]
+    for option_kind, table in [("call", context["calls_with_mid"]), ("put", context["puts_with_mid"])]:
+        if table.empty:
+            continue
+        for _, row in table.iterrows():
+            strike = float(row.get("strike", 0) or 0)
+            iv = float(row.get("impliedVolatility", 0) or 0)
+            if strike <= 0 or iv <= 0:
+                continue
+            if option_kind == "put" and strike > forward:
+                continue
+            if option_kind == "call" and strike < forward:
+                continue
+            rows.append(
+                {
+                    "expiry": context["expiration"],
+                    "strike": strike,
+                    "implied_volatility": iv,
+                    "option_kind": option_kind,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def _historical_price_shocks(history, holding_days):
+    close = history["Close"].dropna().astype(float)
+    returns = close.pct_change(int(holding_days)).dropna()
+    if len(returns) < 20:
+        return [-0.20, -0.10, -0.05, 0.0, 0.05, 0.10, 0.20]
+    quantiles = returns.quantile([0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99])
+    shocks = sorted({round(float(value), 4) for value in quantiles if pd.notna(value)} | {0.0})
+    return shocks
 
 
 def _render_risk_management(context, analytics):
@@ -432,20 +530,28 @@ def _render_risk_management(context, analytics):
         dividend_yield=dividend_yield,
         volatility=analytics["model_iv"],
         time_to_maturity=analytics["T"],
+        price_shocks=_historical_price_shocks(context["history"], holding_days),
     )
     st.pyplot(plot_risk_matrix(matrix, title="Selected Contract P&L and Greeks Risk Matrix"))
 
     returns = context["history"]["Close"].pct_change().dropna()
     var_summary = historical_var_es_summary(returns, confidence_level=0.95, portfolio_value=context["spot"])
-    risk_cols = st.columns(3)
+    try:
+        filtered_summary = ewma_var_es_summary(returns, confidence_level=0.95, portfolio_value=context["spot"])
+    except ValueError:
+        filtered_summary = var_summary
+    risk_cols = st.columns(4)
     risk_cols[0].metric("Historical VaR 95%", f"{var_summary['var']:.2f}")
     risk_cols[1].metric("Expected Shortfall 95%", f"{var_summary['expected_shortfall']:.2f}")
-    risk_cols[2].metric("Tail observations", var_summary["tail_observations"])
+    risk_cols[2].metric("EWMA VaR 95%", f"{filtered_summary['var']:.2f}")
+    risk_cols[3].metric("EWMA ES 95%", f"{filtered_summary['expected_shortfall']:.2f}")
 
     st.subheader("Vol Curve Monitor")
-    curves = build_demo_vol_curves()
-    st.pyplot(plot_vol_curve_monitor(curves, expiry="2026-07-17", forward=100))
-    st.caption("The vol-curve monitor uses demo curve data here. Replace this DataFrame with saved/live IV nodes for production use.")
+    curves = _live_vol_curve_nodes(context)
+    if len(curves) >= 4:
+        st.pyplot(plot_vol_curve_monitor(curves, expiry=context["expiration"], forward=context["spot"]))
+    else:
+        st.info("Not enough live OTM IV nodes from the current yfinance chain to draw a curve monitor.")
 
 
 st.set_page_config(page_title="Option Analysis System", layout="wide")
@@ -462,6 +568,11 @@ with st.sidebar:
     risk_free_rate = st.number_input("Risk-free rate", value=0.04, step=0.005, format="%.4f")
     dividend_yield = st.number_input("Dividend yield", value=0.00, step=0.005, format="%.4f")
     holding_days = st.number_input("Backtest holding days", value=20, min_value=1, max_value=252)
+    initial_capital = st.number_input("Initial capital", value=100000.0, min_value=1.0, step=1000.0)
+    contract_multiplier = st.number_input("Contract multiplier", value=100, min_value=1, step=1)
+    transaction_cost_per_contract = st.number_input("Commission per contract", value=0.65, min_value=0.0, step=0.05)
+    slippage_per_contract = st.number_input("Slippage per contract", value=0.01, min_value=0.0, step=0.01)
+    non_overlapping = st.checkbox("Use non-overlapping backtest trades", value=True)
     st.caption(f"American pricing uses CRR steps fixed at n = {CRR_STEPS}")
     st.divider()
     max_spread_pct = st.slider("Max bid/ask spread", 0.05, 2.00, 0.50, 0.05)
@@ -506,7 +617,16 @@ analytics = _selected_contract_analytics(
 if page == "Contract Quote":
     _render_contract_quote(context, analytics, ticker, option_style)
 elif page == "Backtest":
-    _render_backtest(context, analytics, holding_days)
+    _render_backtest(
+        context,
+        analytics,
+        holding_days,
+        initial_capital,
+        non_overlapping,
+        slippage_per_contract,
+        transaction_cost_per_contract,
+        contract_multiplier,
+    )
 elif page == "Greek Letters":
     _render_greek_letters(context, analytics)
 else:

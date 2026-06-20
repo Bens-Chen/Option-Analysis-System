@@ -5,3 +5,6 @@ pytest
 scipy
 streamlit
 yfinance
+fastapi
+uvicorn
+httpx

@@ -160,18 +160,4 @@ def VIX_SVIX(St, r, T, K_list, call_price_list, put_price_list, F=None):
     }
 
 
-if __name__ == "__main__":
-    K_list = [90, 95, 100, 105, 110]
-    call_price_list = [12.0, 8.0, 5.0, 2.8, 1.4]
-    put_price_list = [1.2, 2.5, 4.8, 7.6, 11.0]
 
-    result = VIX_SVIX(
-        St=100,
-        r=0.04,
-        T=30 / 365,
-        K_list=K_list,
-        call_price_list=call_price_list,
-        put_price_list=put_price_list,
-    )
-
-    print(result)

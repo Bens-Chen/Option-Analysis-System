@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 
 from .risk_matrix import OptionLeg, build_demo_risk_matrix, build_risk_matrix, plot_risk_matrix
 from .var_es import (
+    ewma_var_es_summary,
     historical_expected_shortfall,
     historical_var,
     historical_var_es_summary,
@@ -18,6 +19,7 @@ __all__ = [
     "build_demo_vol_curves",
     "build_demo_vol_tracker",
     "build_risk_matrix",
+    "ewma_var_es_summary",
     "historical_expected_shortfall",
     "historical_var",
     "historical_var_es_summary",

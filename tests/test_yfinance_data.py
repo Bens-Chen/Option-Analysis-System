@@ -26,6 +26,19 @@ def test_estimate_annualized_volatility_from_close_prices():
     assert estimate_annualized_volatility(history) > 0
 
 
+def test_estimate_annualized_volatility_accepts_newey_west_lags():
+    returns = np.array([0.010, 0.012, 0.011, -0.004, -0.003, 0.009, 0.010, 0.008])
+    close = 100 * np.exp(np.cumsum(returns))
+    history = pd.DataFrame({"Close": close})
+
+    lag_zero = estimate_annualized_volatility(history, lags=0)
+    lag_two = estimate_annualized_volatility(history, lags=2)
+
+    assert lag_zero > 0
+    assert lag_two > 0
+    assert lag_zero != lag_two
+
+
 def test_option_mid_price_uses_last_price_when_bid_or_ask_is_missing():
     row = pd.Series({"bid": np.nan, "ask": 2.0, "lastPrice": 1.8})
 

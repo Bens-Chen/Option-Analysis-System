@@ -8,59 +8,27 @@ from scipy.optimize import minimize
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from Methods.black_scholes import BS
-
-
-def _bs_price(S, K, r, q, sigma, T, option_kind):
-    call_price, put_price = BS(S, K, r, q, sigma, T)
-    if option_kind == "call":
-        return call_price
-    if option_kind == "put":
-        return put_price
-    raise ValueError("option_kind must be 'call' or 'put'.")
+from Implied_Volatility.constant_IV import implied_volatility_bisection
 
 
 def implied_volatility_bs(S,K,r,q,T,market_price,option_kind="call",lower_bound=1e-6,upper_bound=5.0,tolerance=1e-8,max_iterations=200):
-    """Use bisection to find the BS implied volatility for one option."""
-    if S <= 0 or K <= 0:
-        raise ValueError("S and K must be positive.")
-    if T <= 0:
-        raise ValueError("T must be positive.")
-    if market_price <= 0:
-        raise ValueError("market_price must be positive.")
-
-    def objective(sigma):
-        return _bs_price(S, K, r, q, sigma, T, option_kind) - market_price
-
-    low = lower_bound
-    high = upper_bound
-    f_low = objective(low)
-    f_high = objective(high)
-
-    if f_low * f_high > 0:
-        raise ValueError(
-            "Cannot bracket implied volatility. Check market_price or widen bounds."
-        )
-
-    for _ in range(max_iterations):
-        mid = (low + high) / 2
-        f_mid = objective(mid)
-
-        if abs(f_mid) < tolerance:
-            return mid
-
-        if f_low * f_mid < 0:
-            high = mid
-            f_high = f_mid
-        else:
-            low = mid
-            f_low = f_mid
-
-    return (low + high) / 2
+    """Use the shared constant_IV bisection solver for one BS IV."""
+    return implied_volatility_bisection(
+        S=S,
+        K=K,
+        r=r,
+        q=q,
+        T=T,
+        market_price=market_price,
+        option_kind=option_kind,
+        lower_bound=lower_bound,
+        upper_bound=upper_bound,
+        tolerance=tolerance,
+        max_iterations=max_iterations,
+    )
 
 
 def IV_smile(S,K_list,r,q,T,market_price_list,option_kind="call",skip_errors=False):
-    """Calculate one implied volatility for each strike."""
     option_data = sorted(zip(K_list, market_price_list))
 
     smile = []
