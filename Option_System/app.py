@@ -5,6 +5,7 @@ import sys
 from importlib.machinery import SourceFileLoader
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -26,6 +27,7 @@ from Market_Data.yfinance_data import (
     matched_option_chain_prices,
     summarize_option_chain_quality,
 )
+from Implied_Volatility.iv_surface import current_otm_surface_iv
 from Option_System.analytics import (
     black_scholes_greeks,
     crr_greeks_by_bump,
@@ -51,7 +53,7 @@ from Option_System.research import (
 )
 from Risk_Management.risk_matrix import OptionLeg, build_risk_matrix, plot_risk_matrix
 from Risk_Management.var_es import ewma_var_es_summary, historical_var_es_summary
-from Risk_Management.vol_curve_monitor import plot_vol_curve_monitor
+from Risk_Management.vol_curve_monitor import plot_vol_curve_monitor, vol_curve_diagnostics
 from iv_smile import IV_smile_arrays, fit_svi_smile
 
 
@@ -65,7 +67,7 @@ def _load_vix_svix_module():
 
 
 VIX_SVIX_MODULE = _load_vix_svix_module()
-CRR_STEPS = 10000
+CRR_STEPS = 500
 
 
 @st.cache_data(ttl=900)
@@ -136,6 +138,7 @@ def _load_market_context(
     chain_table = chain_table.sort_values("distance_from_spot").reset_index(drop=True)
 
     return {
+        "ticker": ticker,
         "history": history,
         "spot": spot,
         "historical_vol": historical_vol,
@@ -157,7 +160,20 @@ def _selected_contract_analytics(context, selected_symbol, option_kind, option_s
     T = _days_to_years(context["expiration"])
     market_price = _mid_price(selected)
     yfinance_iv = float(selected.get("impliedVolatility", 0) or 0)
-    pricing_model = "CRR" if option_style == "American" else "BS"
+    try:
+        forward = estimate_forward_price(context["matched_chain"], risk_free_rate, T)["F"]
+    except Exception:
+        forward = spot
+    try:
+        model_volatility, model_volatility_source = current_otm_surface_iv(
+            context["calls_with_mid"],
+            context["puts_with_mid"],
+            forward,
+            float(selected["strike"]),
+        )
+    except ValueError:
+        model_volatility = historical_vol
+        model_volatility_source = "Newey-West volatility"
 
     try:
         model_iv = implied_volatility_from_price(
@@ -168,14 +184,12 @@ def _selected_contract_analytics(context, selected_symbol, option_kind, option_s
             dividend_yield,
             T,
             option_kind,
-            pricing_model=pricing_model,
-            option_style=option_style,
-            steps=CRR_STEPS,
+            pricing_model="BS",
         )
         iv_note = ""
     except ValueError as exc:
         model_iv = historical_vol
-        iv_note = f"Could not solve model IV from market price. Historical volatility is used instead. Detail: {exc}"
+        iv_note = f"Could not solve market implied IV from market price. Newey-West volatility is shown instead. Detail: {exc}"
 
     if option_style == "American":
         model_price = crr_option_price(
@@ -183,7 +197,7 @@ def _selected_contract_analytics(context, selected_symbol, option_kind, option_s
             float(selected["strike"]),
             risk_free_rate,
             dividend_yield,
-            model_iv,
+            model_volatility,
             T,
             option_kind,
             option_style="American",
@@ -194,7 +208,7 @@ def _selected_contract_analytics(context, selected_symbol, option_kind, option_s
             float(selected["strike"]),
             risk_free_rate,
             dividend_yield,
-            model_iv,
+            model_volatility,
             T,
             option_kind,
             option_style="American",
@@ -206,7 +220,7 @@ def _selected_contract_analytics(context, selected_symbol, option_kind, option_s
             float(selected["strike"]),
             risk_free_rate,
             dividend_yield,
-            model_iv,
+            model_volatility,
             T,
             option_kind,
         )
@@ -215,10 +229,36 @@ def _selected_contract_analytics(context, selected_symbol, option_kind, option_s
             float(selected["strike"]),
             risk_free_rate,
             dividend_yield,
-            model_iv,
+            model_volatility,
             T,
             option_kind,
         )
+
+    market_iv_for_price = yfinance_iv if yfinance_iv > 0 else model_iv
+    market_iv_price = None
+    if market_iv_for_price > 0:
+        if option_style == "American":
+            market_iv_price = crr_option_price(
+                spot,
+                float(selected["strike"]),
+                risk_free_rate,
+                dividend_yield,
+                market_iv_for_price,
+                T,
+                option_kind,
+                option_style="American",
+                steps=CRR_STEPS,
+            )
+        else:
+            market_iv_price = option_price_from_bs(
+                spot,
+                float(selected["strike"]),
+                risk_free_rate,
+                dividend_yield,
+                market_iv_for_price,
+                T,
+                option_kind,
+            )
 
     return {
         "selected": selected,
@@ -226,7 +266,12 @@ def _selected_contract_analytics(context, selected_symbol, option_kind, option_s
         "market_price": market_price,
         "yfinance_iv": yfinance_iv,
         "model_iv": model_iv,
+        "model_volatility": model_volatility,
+        "model_volatility_source": model_volatility_source,
+        "historical_volatility": historical_vol,
         "model_price": model_price,
+        "market_iv_price": market_iv_price,
+        "market_iv_source": "yfinance IV" if yfinance_iv > 0 else "solved IV",
         "greeks": greeks,
         "iv_note": iv_note,
     }
@@ -234,13 +279,17 @@ def _selected_contract_analytics(context, selected_symbol, option_kind, option_s
 
 def _render_contract_quote(context, analytics, active_ticker, option_style):
     st.subheader("Selected Contract Quote")
-    quote_cols = st.columns(4)
+    quote_cols = st.columns(5)
     quote_cols[0].metric("yfinance price", f"{analytics['market_price']:.4f}")
-    quote_cols[1].metric(f"{option_style} model price", f"{analytics['model_price']:.4f}")
-    quote_cols[2].metric("yfinance IV", f"{analytics['yfinance_iv']:.2%}" if analytics["yfinance_iv"] > 0 else "N/A")
-    quote_cols[3].metric("model IV", f"{analytics['model_iv']:.2%}")
+    quote_cols[1].metric(f"{option_style} surface price", f"{analytics['model_price']:.4f}")
+    quote_cols[2].metric("Market-IV price", _format_metric(analytics["market_iv_price"], "{:.4f}"))
+    quote_cols[3].metric("Surface IV", f"{analytics['model_volatility']:.2%}")
+    quote_cols[4].metric("yfinance IV", f"{analytics['yfinance_iv']:.2%}" if analytics["yfinance_iv"] > 0 else "N/A")
     if analytics["iv_note"]:
         st.warning(analytics["iv_note"])
+    st.caption(
+        f"Surface price uses {analytics['model_volatility_source']}. Market-IV price uses {analytics['market_iv_source']}."
+    )
 
     selected = analytics["selected"]
     meta_cols = st.columns(4)
@@ -264,6 +313,95 @@ def _render_contract_quote(context, analytics, active_ticker, option_style):
     st.dataframe(context["chain_table"][display_cols].head(25), use_container_width=True)
 
 
+def _live_iv_surface_points(context, max_expirations=10):
+    selected_expiration = context["expiration"]
+    expirations = [selected_expiration]
+    expirations.extend([expiration for expiration in context["expirations"] if expiration != selected_expiration])
+    rows = []
+
+    for expiration in expirations[:max_expirations]:
+        chain = context["chain"] if expiration == selected_expiration else _cached_option_chain(context["ticker"], expiration)
+        calls = add_mid_prices(chain["calls"])
+        puts = add_mid_prices(chain["puts"])
+        matched = matched_option_chain_prices(calls, puts)
+        days_to_expiration = max((pd.to_datetime(expiration).date() - date.today()).days, 1)
+        try:
+            forward = estimate_forward_price(matched, risk_free_rate, days_to_expiration / 365)["F"]
+        except Exception:
+            forward = context["spot"]
+
+        for option_kind, table in [("put", puts), ("call", calls)]:
+            if table.empty:
+                continue
+            strikes = pd.to_numeric(table["strike"], errors="coerce")
+            ivs = pd.to_numeric(table["impliedVolatility"], errors="coerce")
+            valid = strikes.gt(0) & ivs.gt(0) & ivs.le(5.0) & np.isfinite(strikes) & np.isfinite(ivs)
+            if option_kind == "put":
+                valid &= strikes.lt(forward)
+            else:
+                valid &= strikes.gt(forward)
+            nodes = pd.DataFrame(
+                {
+                    "expiration": expiration,
+                    "days_to_expiration": days_to_expiration,
+                    "strike": strikes[valid].astype(float),
+                    "impliedVolatility": ivs[valid].astype(float),
+                    "option_kind": option_kind,
+                }
+            )
+            rows.append(nodes)
+
+    if not rows:
+        return pd.DataFrame()
+    surface = pd.concat(rows, ignore_index=True)
+    if surface.empty:
+        return surface
+    return (
+        surface.groupby(["expiration", "days_to_expiration", "strike"], as_index=False)
+        .agg({"impliedVolatility": "median", "option_kind": "first"})
+        .sort_values(["days_to_expiration", "strike"])
+        .reset_index(drop=True)
+    )
+
+
+def _plot_iv_surface(surface, selected_strike, selected_days, selected_iv):
+    fig = plt.figure(figsize=(10, 7))
+    try:
+        ax = fig.add_subplot(111, projection="3d", computed_zorder=False)
+    except AttributeError:
+        ax = fig.add_subplot(111, projection="3d")
+
+    x = surface["strike"].to_numpy(dtype=float)
+    y = surface["days_to_expiration"].to_numpy(dtype=float)
+    z = surface["impliedVolatility"].to_numpy(dtype=float) * 100
+    if len(surface) >= 6 and len(np.unique(x)) >= 3 and len(np.unique(y)) >= 2:
+        ax.plot_trisurf(x, y, z, cmap="viridis", alpha=0.62, linewidth=0.2, zorder=1)
+    ax.scatter(x, y, z, color="#1f77b4", s=16, alpha=0.60, label="OTM IV nodes", zorder=2)
+
+    selected_z = float(selected_iv) * 100
+    ax.scatter(
+        [selected_strike],
+        [selected_days],
+        [selected_z],
+        color="red",
+        s=90,
+        marker="o",
+        depthshade=False,
+        label="Selected contract",
+        zorder=100,
+    )
+    ax.set_xlabel("Strike", labelpad=6)
+    ax.set_ylabel("DTE", labelpad=6)
+    ax.set_zlabel("IV (%)", labelpad=6)
+    ax.set_title("IV Surface")
+    ax.view_init(elev=24, azim=-132)
+    ax.tick_params(axis="both", which="major", labelsize=8, pad=1)
+    ax.tick_params(axis="z", which="major", labelsize=8, pad=1)
+    ax.legend(loc="upper left", fontsize=8, frameon=True)
+    fig.subplots_adjust(left=0.02, right=0.98, bottom=0.02, top=0.94)
+    return fig
+
+
 def _render_greek_letters(context, analytics):
     st.subheader("Greek Letters")
     greeks = analytics["greeks"]
@@ -274,7 +412,7 @@ def _render_greek_letters(context, analytics):
     metric_cols[3].metric("Vega", f"{greeks['vega']:.4f}")
     metric_cols[4].metric("Rho", f"{greeks['rho']:.4f}")
     if "model_price" in greeks:
-        st.caption(f"CRR American model price using model IV: {greeks['model_price']:.4f}")
+        st.caption(f"CRR American model price using current surface volatility: {greeks['model_price']:.4f}")
 
     st.subheader("IV Smile and VIX/SVIX")
     try:
@@ -287,7 +425,7 @@ def _render_greek_letters(context, analytics):
             put_price_list=context["matched_chain"]["put_mid"].tolist(),
         )
         comparison_cols = st.columns(4)
-        comparison_cols[0].metric("Selected model IV", f"{analytics['model_iv']:.2%}")
+        comparison_cols[0].metric("Selected implied IV", f"{analytics['model_iv']:.2%}")
         comparison_cols[1].metric("VIX", f"{indicator_result['VIX']['vix']:.2f}")
         comparison_cols[2].metric("SVIX", f"{indicator_result['SVIX']['svix']:.2f}")
         comparison_cols[3].metric("VIX - SVIX", f"{indicator_result['VIX']['vix'] - indicator_result['SVIX']['svix']:.2f}")
@@ -319,6 +457,25 @@ def _render_greek_letters(context, analytics):
         st.pyplot(fig)
     except Exception as exc:
         st.warning(f"Could not build SVI IV smile for this option chain: {exc}")
+
+    try:
+        surface = _live_iv_surface_points(context)
+        if surface.empty:
+            st.info("Not enough live OTM IV nodes to draw an IV surface.")
+        else:
+            selected = analytics["selected"]
+            selected_iv = analytics["yfinance_iv"] if analytics["yfinance_iv"] > 0 else analytics["model_volatility"]
+            selected_days = int(round(analytics["T"] * 365))
+            st.pyplot(
+                _plot_iv_surface(
+                    surface,
+                    float(selected["strike"]),
+                    selected_days,
+                    selected_iv,
+                )
+            )
+    except Exception as exc:
+        st.warning(f"Could not build IV surface from the available option chains: {exc}")
 
 
 def _build_strategy_legs(strategy, selected, chain, other_strike, ratio_quantity=2):
@@ -357,6 +514,7 @@ def _format_metric(value, fmt="{:.2f}", missing="N/A"):
 
 def _portfolio_greeks(legs, spot, risk_free_rate, dividend_yield, volatility, time_to_maturity, contract_multiplier):
     totals = {"delta": 0.0, "gamma": 0.0, "theta_per_day": 0.0, "vega": 0.0, "rho": 0.0}
+    total_quantity = 0
     for leg in legs:
         greeks = black_scholes_greeks(
             spot,
@@ -368,9 +526,14 @@ def _portfolio_greeks(legs, spot, risk_free_rate, dividend_yield, volatility, ti
             leg["option_kind"],
         )
         side = 1 if leg["side"] == "long" else -1
-        scale = side * int(leg.get("quantity", 1)) * contract_multiplier
+        quantity = abs(int(leg.get("quantity", 1)))
+        scale = side * quantity
+        total_quantity += quantity
         for key in totals:
             totals[key] += float(greeks[key]) * scale
+    if total_quantity > 0:
+        for key in totals:
+            totals[key] /= total_quantity
     return totals
 
 
@@ -380,7 +543,7 @@ def _render_portfolio_greeks(legs, context, analytics, contract_multiplier):
         context["spot"],
         risk_free_rate,
         dividend_yield,
-        analytics["model_iv"],
+        analytics["model_volatility"],
         analytics["T"],
         contract_multiplier,
     )
@@ -391,10 +554,6 @@ def _render_portfolio_greeks(legs, context, analytics, contract_multiplier):
     greek_cols[2].metric("Theta/day", f"{greeks['theta_per_day']:.2f}")
     greek_cols[3].metric("Vega", f"{greeks['vega']:.2f}")
     greek_cols[4].metric("Rho", f"{greeks['rho']:.2f}")
-    st.caption(
-        "Strategy Greeks are the sum of each leg's Greek after long/short sign, quantity, and contract multiplier. "
-        "This uses BS Greeks with the selected contract's model IV as a portfolio approximation."
-    )
 
 
 def _backtest_diagnostics(metrics, backtest, holding_days, non_overlapping):
@@ -587,7 +746,7 @@ def _render_risk_management(context, analytics):
         spot=context["spot"],
         risk_free_rate=risk_free_rate,
         dividend_yield=dividend_yield,
-        volatility=analytics["model_iv"],
+        volatility=analytics["model_volatility"],
         time_to_maturity=analytics["T"],
         price_shocks=_historical_price_shocks(context["history"], holding_days),
     )
@@ -609,8 +768,21 @@ def _render_risk_management(context, analytics):
     curves = _live_vol_curve_nodes(context)
     if len(curves) >= 4:
         st.pyplot(plot_vol_curve_monitor(curves, expiry=context["expiration"], forward=context["spot"]))
+        diagnostics, curve_summary = vol_curve_diagnostics(curves, expiry=context["expiration"], forward=context["spot"])
+        curve_cols = st.columns(4)
+        curve_cols[0].metric("ATM IV", f"{curve_summary['atm_iv_pct']:.2f}%")
+        curve_cols[1].metric("IV range", f"{curve_summary['iv_range_pct']:.2f} vol pts")
+        curve_cols[2].metric("Max |curvature|", f"{curve_summary['max_abs_curvature']:.4f}")
+        curve_cols[3].metric("ATM strike", f"{curve_summary['atm_strike']:.2f}")
         st.caption(
-            "Smoothed IV shows the fitted smile across strikes; Curvature highlights where the smile bends sharply, which can indicate skew concentration, sparse quotes, or noisy IV nodes."
+            "Curvature is the second derivative of the fitted IV smile. Large absolute curvature marks strikes where IV bends sharply; that can indicate skew concentration, noisy quotes, sparse strikes, or local relative-value points for spreads and butterflies."
+        )
+        display_curve = diagnostics.sort_values("abs_curvature", ascending=False).head(8)
+        st.dataframe(
+            display_curve[
+                ["strike", "moneyness", "curve_zone", "iv_pct", "slope_per_strike", "curvature", "abs_curvature"]
+            ],
+            use_container_width=True,
         )
     else:
         st.info("Not enough live OTM IV nodes from the current yfinance chain to draw a curve monitor.")
@@ -622,7 +794,7 @@ st.title("Option Analysis System")
 with st.sidebar:
     page = st.selectbox(
         "Menu",
-        ["Contract Quote", "Backtest", "Greek Letters", "Risk Management"],
+        ["Contract Quote", "Backtest", "Greek Letters & IV Smile/Surface", "Risk Management"],
     )
     ticker = st.text_input("Ticker", value="AAPL").upper().strip()
     option_style = st.selectbox("Exercise style", ["European", "American"])
@@ -635,7 +807,7 @@ with st.sidebar:
     transaction_cost_per_contract = st.number_input("Commission per contract", value=0.65, min_value=0.0, step=0.05)
     slippage_per_contract = st.number_input("Slippage per contract", value=0.01, min_value=0.0, step=0.01)
     non_overlapping = st.checkbox("Use non-overlapping backtest trades", value=True)
-    st.caption(f"American pricing uses CRR steps fixed at n = {CRR_STEPS}")
+    st.caption(f"American pricing uses CRR steps fixed at n = {CRR_STEPS} for interactive speed")
     st.divider()
     max_spread_pct = st.slider("Max bid/ask spread", 0.05, 2.00, 0.50, 0.05)
     min_open_interest = st.number_input("Min open interest", value=0, min_value=0, step=10)
@@ -689,7 +861,7 @@ elif page == "Backtest":
         transaction_cost_per_contract,
         contract_multiplier,
     )
-elif page == "Greek Letters":
+elif page == "Greek Letters & IV Smile/Surface":
     _render_greek_letters(context, analytics)
 else:
     _render_risk_management(context, analytics)

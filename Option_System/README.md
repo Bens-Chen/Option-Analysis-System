@@ -43,6 +43,8 @@ Each entry date rebuilds the selected strategy by the same strike/spot ratios as
 
 The displayed metrics include average PnL, total PnL, win rate, Sharpe ratio, MDD, estimated margin, return on margin, VaR, and Expected Shortfall. The margin estimate is still approximate, especially for uncovered short-option risk.
 
+The selected contract surface price uses the current filtered OTM IV surface. The displayed Newey-West volatility is kept as a historical-volatility reference, while the rolling backtest uses rolling Newey-West volatility because yfinance does not provide historical IV surfaces.
+
 The IV-rank value in the app is also a proxy. True IV rank requires historical implied volatility observations. Since yfinance does not provide a complete historical option-chain database here, the app ranks current ATM IV against the current surface range instead.
 
 ## Quote Quality Controls

@@ -15,6 +15,7 @@ from Risk_Management.risk_visuals import (
     plot_risk_matrix,
     plot_vol_curve_monitor,
     plot_vol_tracker,
+    vol_curve_diagnostics,
 )
 
 
@@ -36,6 +37,14 @@ def test_vol_curve_monitor_plot_builds_figure():
     fig = plot_vol_curve_monitor(build_demo_vol_curves(), expiry="2026-07-17", forward=100)
 
     assert len(fig.axes) == 3
+
+
+def test_vol_curve_diagnostics_returns_curvature_table():
+    table, summary = vol_curve_diagnostics(build_demo_vol_curves(), expiry="2026-07-17", forward=100)
+
+    assert {"moneyness", "iv_pct", "slope_per_strike", "curvature", "abs_curvature", "curve_zone"} <= set(table.columns)
+    assert summary["iv_range_pct"] > 0
+    assert summary["max_abs_curvature"] >= 0
 
 
 def test_vol_tracker_plot_builds_figure():

@@ -1,6 +1,7 @@
 import pandas as pd
 import pytest
 
+from Implied_Volatility.iv_surface import current_otm_surface_iv
 from Option_System.analytics import black_scholes_greeks, crr_greeks_by_bump, implied_volatility_from_price, option_price_from_bs
 from Option_System.research import (
     build_research_chain_table,
@@ -116,6 +117,26 @@ def test_backtest_metrics_uses_initial_capital_returns():
     assert metrics["ending_equity"] == pytest.approx(10200)
     assert {"mdd_pct", "var_95", "expected_shortfall_95", "var_95_amount", "expected_shortfall_95_amount"} <= set(metrics)
     assert metrics["var_95_amount"] == pytest.approx(metrics["var_95"] * 10000)
+
+
+def test_current_otm_surface_iv_interpolates_from_otm_nodes():
+    calls = pd.DataFrame(
+        {
+            "strike": [105.0, 110.0, 115.0],
+            "impliedVolatility": [0.22, 0.24, 0.27],
+        }
+    )
+    puts = pd.DataFrame(
+        {
+            "strike": [85.0, 90.0, 95.0],
+            "impliedVolatility": [0.31, 0.28, 0.25],
+        }
+    )
+
+    surface_iv, source = current_otm_surface_iv(calls, puts, forward=100, strike=105)
+
+    assert source == "current OTM IV surface"
+    assert 0.20 < surface_iv < 0.30
 
 
 def test_crr_greeks_supports_american_option_style():

@@ -92,7 +92,9 @@ In the Black-Scholes model, volatility is assumed to be constant. Under this ass
 
 In real option markets, this is usually not true. When we solve implied volatility from market option prices, implied volatility often changes across strikes and maturities. Plotting implied volatility against strike gives a volatility smile or volatility smirk. Plotting it across both strike and maturity gives an implied volatility surface.
 
+`iv_surface.py` builds a current-market IV slice from yfinance option-chain IVs. The method keeps out-of-the-money puts below the forward and out-of-the-money calls above the forward, then interpolates IV by moneyness with a shape-preserving PCHIP curve. If the selected strike is outside the available OTM range, it falls back to the nearest valid OTM IV node.
 
+This surface IV is useful as a market-consistent volatility input for pricing the selected contract and for model-based backtests. It should not be confused with historical volatility: historical volatility is estimated from past returns, while surface IV is inferred from current option quotes.
 
 ## Calibration Models
 

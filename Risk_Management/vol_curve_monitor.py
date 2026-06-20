@@ -87,3 +87,44 @@ def plot_vol_curve_monitor(curves, expiry=None, forward=None):
     ax_compare.legend(ncol=2, fontsize=8)
 
     return fig
+
+
+def vol_curve_diagnostics(curves, expiry=None, forward=None):
+    if expiry is None:
+        expiry = str(curves["expiry"].iloc[0])
+    selected = curves[curves["expiry"] == expiry].sort_values("strike").copy()
+    if selected.empty:
+        raise ValueError("expiry was not found in curves.")
+    if len(selected) < 4:
+        raise ValueError("At least four IV nodes are needed for curvature diagnostics.")
+    if forward is None:
+        forward = float(selected["strike"].median())
+
+    strikes = selected["strike"].to_numpy(dtype=float)
+    iv = selected["implied_volatility"].to_numpy(dtype=float)
+    spline = CubicSpline(strikes, iv, bc_type="natural")
+    selected["moneyness"] = selected["strike"].astype(float) / float(forward)
+    selected["iv_pct"] = selected["implied_volatility"].astype(float) * 100
+    selected["slope_per_strike"] = spline(strikes, 1)
+    selected["curvature"] = spline(strikes, 2)
+    selected["abs_curvature"] = selected["curvature"].abs()
+    selected["curve_zone"] = selected["moneyness"].map(_curve_zone)
+
+    summary = {
+        "expiry": expiry,
+        "atm_strike": float(selected.iloc[(selected["strike"].astype(float) - forward).abs().argmin()]["strike"]),
+        "atm_iv_pct": float(selected.iloc[(selected["strike"].astype(float) - forward).abs().argmin()]["iv_pct"]),
+        "min_iv_pct": float(selected["iv_pct"].min()),
+        "max_iv_pct": float(selected["iv_pct"].max()),
+        "iv_range_pct": float(selected["iv_pct"].max() - selected["iv_pct"].min()),
+        "max_abs_curvature": float(selected["abs_curvature"].max()),
+    }
+    return selected, summary
+
+
+def _curve_zone(moneyness):
+    if moneyness < 0.97:
+        return "put wing"
+    if moneyness > 1.03:
+        return "call wing"
+    return "near ATM"
