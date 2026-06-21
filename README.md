@@ -15,10 +15,11 @@ This repository is an option related project. It introduces classic pricing meth
 
 ## Installation
 
+Clone or download this repository, then enter the project folder:
+
 ```bash
-git clone git@github.com:Bens-Chen/Option-Pricing.git
-cd Option-Pricing
-pip install -r requirements.txt
+cd Option-Analysis-System-main
+python -m pip install -r requirements.txt
 ```
 
 ## Quick Start
@@ -26,24 +27,25 @@ pip install -r requirements.txt
 Run the pricing examples:
 
 ```bash
-python examples/black_scholes_example.py
-python examples/crr_example.py
-python examples/monte_carlo_example.py
-python examples/yfinance_black_scholes_example.py
+python -m examples.black_scholes_example
+python -m examples.crr_example
+python -m examples.monte_carlo_example
+python -m examples.yfinance_black_scholes_example
 ```
 
 Run the interactive option analysis system:
 
 ```bash
-streamlit run Option_System/app.py
+python -m streamlit run Option_System/app.py
 ```
 
 The Streamlit app includes contract quotes, Greek letters, strategy backtests, and risk-management views.
+After startup, open the local URL shown by Streamlit, usually `http://localhost:8501`.
 
 Run tests:
 
 ```bash
-pytest
+python -m pytest
 ```
 
 ## Project Structure

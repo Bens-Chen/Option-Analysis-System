@@ -557,23 +557,6 @@ def _render_portfolio_greeks(legs, context, analytics, contract_multiplier):
     greek_cols[4].metric("Rho", f"{greeks['rho']:.2f}")
 
 
-def _backtest_diagnostics(metrics, backtest, holding_days, non_overlapping):
-    notes = []
-    if metrics["win_rate"] >= 0.70:
-        notes.append("Win rate is high. Check whether the strategy is selling tail risk or benefiting from scaled current premiums.")
-    if metrics["win_rate"] <= 0.40:
-        notes.append("Win rate is low. The payoff may need larger underlying moves or better strike selection.")
-    if metrics["return_on_capital"] > 0.20:
-        notes.append("Return on capital is unusually high. Validate volatility proxy, transaction costs, and model-pricing assumptions.")
-    if metrics["expected_shortfall_95"] > abs(metrics["var_95"]) * 1.5:
-        notes.append("Expected shortfall is much larger than VaR, so losses are concentrated in the worst scenarios.")
-    if not non_overlapping and holding_days > 1:
-        notes.append("Holding-period samples overlap, so Sharpe and win rate can look smoother than independent trades.")
-    if backtest["transaction_cost"].sum() > abs(backtest["gross_profit"].sum()) * 0.25:
-        notes.append("Transaction costs are a large share of gross P&L. Liquidity and spread assumptions are driving results.")
-    return notes
-
-
 def _render_backtest(
     context,
     analytics,
@@ -688,13 +671,11 @@ def _render_backtest(
         ax.legend()
         st.pyplot(fig)
 
-    notes = _backtest_diagnostics(metrics, backtest_plot, int(holding_days), non_overlapping)
-    if notes:
-        st.subheader("Backtest Diagnostics")
-        for note in notes:
-            st.write(f"- {note}")
     st.caption(
         "Model rolling backtest: each entry date rebuilds the same moneyness strategy and prices entry/exit options with BS plus a rolling Newey-West volatility proxy from yfinance underlying prices."
+    )
+    st.caption(
+        "In the table, entry_spot and exit_spot are underlying prices. model_entry_value and model_exit_value are the model-estimated option strategy values after side, quantity, and contract multiplier."
     )
     st.dataframe(backtest_plot.tail(30), use_container_width=True)
 
