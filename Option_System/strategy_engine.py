@@ -2,8 +2,6 @@ import numpy as np
 import pandas as pd
 
 from Option_System.analytics import option_price_from_bs
-from Trading_Strategies.straddle import long_straddle_profit, short_straddle_profit
-from Trading_Strategies.strangle import long_strangle_profit, short_strangle_profit
 
 
 def option_leg_profit(stock_prices, option_kind, side, strike, premium, quantity=1):
@@ -33,49 +31,6 @@ def strategy_profit(stock_prices, legs):
             quantity=int(leg.get("quantity", 1)),
         )
     return total
-
-
-def build_strategy_legs(strategy_name, spot, chain_row, other_strike=None, other_premium=None):
-    strike = float(chain_row["strike"])
-    premium = _market_premium(chain_row)
-    option_kind = chain_row["option_kind"]
-
-    if strategy_name == "Single Option":
-        return [{"option_kind": option_kind, "side": "long", "strike": strike, "premium": premium, "quantity": 1}]
-
-    if strategy_name == "Long Straddle":
-        return [
-            {"option_kind": "call", "side": "long", "strike": strike, "premium": premium, "quantity": 1},
-            {"option_kind": "put", "side": "long", "strike": strike, "premium": premium, "quantity": 1},
-        ]
-
-    if strategy_name == "Short Straddle":
-        return [
-            {"option_kind": "call", "side": "short", "strike": strike, "premium": premium, "quantity": 1},
-            {"option_kind": "put", "side": "short", "strike": strike, "premium": premium, "quantity": 1},
-        ]
-
-    if strategy_name == "Long Strangle":
-        upper = float(other_strike or strike * 1.05)
-        lower = min(strike, upper)
-        upper = max(strike, upper)
-        premium2 = float(other_premium if other_premium is not None else premium)
-        return [
-            {"option_kind": "put", "side": "long", "strike": lower, "premium": premium, "quantity": 1},
-            {"option_kind": "call", "side": "long", "strike": upper, "premium": premium2, "quantity": 1},
-        ]
-
-    if strategy_name == "Short Strangle":
-        upper = float(other_strike or strike * 1.05)
-        lower = min(strike, upper)
-        upper = max(strike, upper)
-        premium2 = float(other_premium if other_premium is not None else premium)
-        return [
-            {"option_kind": "put", "side": "short", "strike": lower, "premium": premium, "quantity": 1},
-            {"option_kind": "call", "side": "short", "strike": upper, "premium": premium2, "quantity": 1},
-        ]
-
-    raise ValueError(f"Unknown strategy: {strategy_name}")
 
 
 def _option_leg_from_row(row, option_kind, side, quantity=1):
@@ -260,61 +215,6 @@ def _quote_value(row, column):
     return value if np.isfinite(value) and value > 0 else 0.0
 
 
-def _executable_premium(leg, slippage_per_contract=0.0):
-    side = leg["side"]
-    bid = float(leg.get("bid", 0) or 0)
-    ask = float(leg.get("ask", 0) or 0)
-    mid = float(leg.get("premium", 0) or 0)
-    slippage = max(float(slippage_per_contract), 0.0)
-    if side == "long":
-        base = ask if ask > 0 else mid
-        return max(base + slippage, 0.0)
-    if side == "short":
-        base = bid if bid > 0 else mid
-        return max(base - slippage, 0.0)
-    raise ValueError("side must be 'long' or 'short'.")
-
-
-def rank_strategy_candidates(spot, historical_volatility, selected_iv, trend_signal):
-    iv_ratio = selected_iv / historical_volatility if historical_volatility > 0 else np.nan
-    rows = []
-
-    def add(name, score, reason):
-        rows.append({"strategy": name, "score": round(score, 2), "reason": reason})
-
-    if np.isfinite(iv_ratio) and iv_ratio >= 1.2:
-        add("Short Strangle", 75, "IV is high versus historical volatility, so premium-selling structures receive higher educational score.")
-        add("Short Straddle", 65, "High IV helps option sellers, but risk is concentrated if price moves sharply.")
-        add("Short Call Butterfly", 52, "High IV can make the short middle calls expensive, but butterfly risk/reward depends strongly on strike spacing.")
-    elif np.isfinite(iv_ratio) and iv_ratio <= 0.9:
-        add("Long Straddle", 75, "IV is low versus historical volatility, so long-volatility structures receive higher educational score.")
-        add("Long Strangle", 68, "Lower premium can help, but the underlying must move farther to break even.")
-        add("Long Call Butterfly", 55, "A butterfly can be reviewed when the expected terminal price is near the middle strike.")
-    else:
-        add("Single Option", 55, "IV is close to historical volatility, so the view depends more on direction and strike selection.")
-        add("Long Call Butterfly", 58, "A butterfly fits a range-bound view around the selected middle strike with limited risk.")
-
-    if trend_signal == "bullish":
-        add("Single Option", 62, "Underlying price is above its moving average, so bullish structures can be reviewed.")
-    elif trend_signal == "bearish":
-        add("Single Option", 58, "Underlying price is below its moving average, so bearish structures can be reviewed.")
-
-    return pd.DataFrame(rows).sort_values("score", ascending=False).drop_duplicates("strategy")
-
-
-def moving_average_trend(price_history, short_window=20, long_window=60):
-    close = price_history["Close"].dropna()
-    if len(close) < long_window:
-        return "neutral"
-    short_ma = close.tail(short_window).mean()
-    long_ma = close.tail(long_window).mean()
-    if short_ma > long_ma:
-        return "bullish"
-    if short_ma < long_ma:
-        return "bearish"
-    return "neutral"
-
-
 def rolling_strategy_backtest(
     price_history,
     current_spot,
@@ -456,38 +356,6 @@ def _intrinsic_value(stock_price, strike, option_kind):
     if option_kind == "put":
         return max(strike - stock_price, 0.0)
     raise ValueError("option_kind must be 'call' or 'put'.")
-
-
-def rank_strategies_by_backtest(strategy_results):
-    rows = []
-    for strategy_name, result in strategy_results.items():
-        metrics = result["metrics"]
-        sharpe = metrics.get("sharpe_ratio", np.nan)
-        return_on_margin = metrics.get("return_on_margin", np.nan)
-        mdd = metrics.get("mdd", np.nan)
-        win_rate = metrics.get("win_rate", np.nan)
-        score = 0.0
-        if np.isfinite(sharpe):
-            score += sharpe * 35
-        if np.isfinite(return_on_margin):
-            score += return_on_margin * 100
-        if np.isfinite(win_rate):
-            score += win_rate * 25
-        if np.isfinite(mdd):
-            score += mdd * 0.05
-        rows.append(
-            {
-                "strategy": strategy_name,
-                "score": round(float(score), 2),
-                "sharpe_ratio": sharpe,
-                "mdd": mdd,
-                "margin_estimate": metrics.get("margin_estimate", np.nan),
-                "return_on_margin": return_on_margin,
-                "win_rate": win_rate,
-                "avg_pnl": metrics.get("avg_pnl", np.nan),
-            }
-        )
-    return pd.DataFrame(rows).sort_values("score", ascending=False)
 
 
 def estimate_strategy_margin(legs, spot, width=0.8, contract_multiplier=1):

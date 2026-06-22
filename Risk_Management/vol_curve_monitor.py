@@ -5,7 +5,6 @@ from scipy.interpolate import CubicSpline
 
 
 def build_demo_vol_curves():
-    """Build synthetic implied volatility curves for curve-monitor examples."""
 
     strikes = np.array([80, 85, 90, 95, 100, 105, 110, 115, 120], dtype=float)
     expiries = ["2026-07-17", "2026-08-21", "2026-09-18", "2026-12-18"]
@@ -21,7 +20,6 @@ def build_demo_vol_curves():
 
 
 def plot_vol_curve_monitor(curves, expiry=None, forward=None):
-    """Plot one vol curve in detail and compare curves across expiries."""
 
     if expiry is None:
         expiry = str(curves["expiry"].iloc[0])

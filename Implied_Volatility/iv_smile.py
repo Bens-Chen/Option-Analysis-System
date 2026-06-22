@@ -12,7 +12,6 @@ from Implied_Volatility.constant_IV import implied_volatility_bisection
 
 
 def implied_volatility_bs(S,K,r,q,T,market_price,option_kind="call",lower_bound=1e-6,upper_bound=5.0,tolerance=1e-8,max_iterations=200):
-    """Use the shared constant_IV bisection solver for one BS IV."""
     return implied_volatility_bisection(
         S=S,
         K=K,
@@ -60,7 +59,6 @@ def IV_smile_arrays(
     option_kind="call",
     skip_errors=False,
 ):
-    """Return strikes and IVs as arrays, which is convenient for plotting."""
     smile = IV_smile(S, K_list, r, q, T, market_price_list, option_kind, skip_errors)
     strikes = np.array([row["strike"] for row in smile], dtype=float)
     implied_volatilities = np.array(
@@ -111,7 +109,7 @@ def _svi_objective(params, log_moneyness, implied_volatilities, T):
 
 
 def fit_svi_smile(strikes, implied_volatilities, forward, T):
-    """Fit raw SVI to discrete IV points and return smooth smile data."""
+    #Fit raw SVI to discrete IV points and return smooth smile data.
     if forward <= 0:
         raise ValueError("forward must be positive.")
     if T <= 0:

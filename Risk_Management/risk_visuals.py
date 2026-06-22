@@ -35,9 +35,8 @@ __all__ = [
     "vol_curve_diagnostics",
 ]
 
-
+# open demo plot
 def show_demo_charts():
-    """Open all demo charts with matplotlib."""
 
     plot_risk_matrix(build_demo_risk_matrix())
     plot_vol_curve_monitor(build_demo_vol_curves(), expiry="2026-07-17", forward=100)

@@ -262,18 +262,24 @@ E_t^Q[(S_T-F)^2] =
 \right]
 $$
 
-Since $F=R_fS_t$, the normalized squared excess simple return is:
+In this project, $F$ is estimated from put-call parity:
+
+$$
+F = K + R_f(C-P)
+$$
+
+So the normalized squared excess simple return is written directly around the market-implied forward:
 
 $$
 \left(\frac{S_T}{F}-1\right)^2 =
-\frac{(S_T-F)^2}{R_f^2S_t^2}
+\frac{(S_T-F)^2}{F^2}
 $$
 
 Therefore, the annualized SVIX formula is:
 
 $$
 \text{SVIX}_T^2 =
-\frac{2}{TR_fS_t^2}
+\frac{2R_f}{TF^2}
 \left[
 \int_{0}^{F}P_t(K)\,\mathrm{d}K
 +
@@ -286,7 +292,7 @@ For discrete market strikes, the practical approximation is:
 $$
 \text{SVIX}_T^2
 \approx
-\frac{2}{TR_fS_t^2}
+\frac{2R_f}{TF^2}
 \sum_i \Delta K_i Q(K_i)
 $$
 
@@ -297,7 +303,7 @@ The largest difference is the option-weighting scheme:
 | Indicator | Option weighting | Main interpretation |
 | --- | --- | --- |
 | VIX | Each option price is weighted by $\frac{1}{K^2}$ | Variance swap / log-return / entropy-type risk |
-| SVIX | OTM option prices are integrated over strikes, then scaled by $R_fS_t^2$ | Risk-neutral variance of simple returns |
+| SVIX | OTM option prices are integrated over strikes, then scaled by the put-call-parity forward $F$ | Risk-neutral variance of simple returns |
 
 Because VIX uses $\frac{1}{K^2}$, it gives much larger relative weight to low-strike OTM puts. This makes VIX especially sensitive to downside tail risk and crash insurance.
 

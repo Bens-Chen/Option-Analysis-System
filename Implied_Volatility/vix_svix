@@ -89,6 +89,8 @@ def SVIX(St, r, T, K_list, F, call_price_list, put_price_list):
         raise ValueError("T must be positive.")
     if St <= 0:
         raise ValueError("St must be positive.")
+    if F <= 0:
+        raise ValueError("F must be positive.")
 
     option_data = sorted(zip(K_list, call_price_list, put_price_list))
     K_list = [row[0] for row in option_data]
@@ -119,7 +121,7 @@ def SVIX(St, r, T, K_list, F, call_price_list, put_price_list):
         summation += delta_K * Q_K
 
     Rf = math.exp(r * T)
-    svix_square = 2 / (T * Rf * St**2) * summation
+    svix_square = 2 * Rf / (T * F**2) * summation
 
     if svix_square < 0:
         raise ValueError("SVIX variance is negative. Check option prices and F.")
@@ -158,6 +160,5 @@ def VIX_SVIX(St, r, T, K_list, call_price_list, put_price_list, F=None):
         "SVIX": SVIX(St, r, T, K_list, F, call_price_list, put_price_list),
         "forward": forward,
     }
-
 
 

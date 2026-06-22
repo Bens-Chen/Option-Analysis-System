@@ -9,14 +9,13 @@ from .utils import color_risk_matrix_table, format_number
 
 @dataclass(frozen=True)
 class OptionLeg:
-    """One option position in a simple risk matrix."""
 
     option_kind: str
     strike: float
     quantity: int
     multiplier: int = 100
 
-
+# Calculate portfolio P&L and Greeks across underlying price shocks.
 def build_risk_matrix(
     legs,
     spot,
@@ -26,7 +25,6 @@ def build_risk_matrix(
     time_to_maturity,
     price_shocks=None,
 ):
-    """Calculate portfolio P&L and Greeks across underlying price shocks."""
 
     if price_shocks is None:
         price_shocks = [-0.40, -0.20, -0.10, -0.05, 0.0, 0.05, 0.10, 0.20, 0.40]

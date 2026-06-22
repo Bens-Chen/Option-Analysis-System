@@ -45,3 +45,24 @@ def test_vix_svix_uses_put_call_parity_forward_when_f_is_missing():
     assert result["forward"]["F"] == expected_forward
     assert result["VIX"]["F"] == expected_forward
     assert result["SVIX"]["F"] == expected_forward
+
+
+def test_svix_normalizes_by_put_call_parity_forward():
+    module = load_vix_svix_module()
+    r = 0.04
+    T = 30 / 365
+    F = 101.0
+
+    result = module.SVIX(
+        St=100,
+        r=r,
+        T=T,
+        K_list=[95, 100, 105],
+        F=F,
+        call_price_list=[8.0, 5.2, 3.0],
+        put_price_list=[2.0, 4.9, 7.5],
+    )
+
+    summation = 5 * 2.0 + 5 * ((5.2 + 4.9) / 2) + 5 * 3.0
+    expected_variance = 2 * math.exp(r * T) * summation / (T * F**2)
+    assert result["variance"] == expected_variance

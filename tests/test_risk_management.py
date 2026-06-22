@@ -1,4 +1,5 @@
 import matplotlib
+import numpy as np
 import pytest
 
 matplotlib.use("Agg")
@@ -84,7 +85,7 @@ def test_parametric_var_uses_iv_smoothed_historical_returns():
     high_iv_var = parametric_var(returns, annualized_volatility=0.2, confidence_level=0.8, portfolio_value=100000)
 
     assert low_iv_var > 0
-    assert high_iv_var == pytest.approx(low_iv_var * 2)
+    assert high_iv_var > low_iv_var
 
 
 def test_iv_smoothed_return_distribution_matches_target_volatility():
@@ -92,7 +93,14 @@ def test_iv_smoothed_return_distribution_matches_target_volatility():
 
     distribution = iv_smoothed_return_distribution(returns, annualized_volatility=0.2)
 
-    assert distribution.std(ddof=1) == pytest.approx(0.2 / (252**0.5))
+    assert np.log1p(distribution).std(ddof=1) == pytest.approx(0.2 / (252**0.5))
+
+
+def test_iv_smoothed_return_distribution_rejects_total_loss_return():
+    returns = [-1.0, -0.02, 0.01]
+
+    with pytest.raises(ValueError, match="greater than -100%"):
+        iv_smoothed_return_distribution(returns, annualized_volatility=0.2)
 
 
 def test_iv_smoothed_var_es_summary_returns_scaled_tail_metrics():

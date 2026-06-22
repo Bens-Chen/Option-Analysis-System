@@ -204,14 +204,8 @@ def matched_option_chain_prices(calls, puts):
     merged = merged[(merged["call_mid"] > 0) & (merged["put_mid"] > 0)]
     return merged.sort_values("strike").reset_index(drop=True)
 
-
+# put call parity
 def estimate_forward_price(matched_prices, risk_free_rate, time_to_maturity):
-    """Estimate the option-implied forward using put-call parity.
-
-    For a matched call and put with the same strike and maturity:
-    C - P = exp(-rT) * (F - K), so F = K + exp(rT) * (C - P).
-    The reference strike is the row where call and put prices are closest.
-    """
     if time_to_maturity <= 0:
         raise ValueError("time_to_maturity must be positive.")
 

@@ -46,12 +46,10 @@ def pathwise(S,K,r,q,sigma,T,num_simulations=100000,num_repetitions=20,h=None,se
     call_rho = discount * (call_indicator * dST_dr - T * call_payoff)
     put_rho = discount * (-put_indicator * dST_dr - T * put_payoff)
 
-    # Theta is defined as time decay: theta = -d(option value) / dT.
     call_theta = discount * (r * call_payoff - call_indicator * dST_dT)
     put_theta = discount * (r * put_payoff + put_indicator * dST_dT)
 
-    # The vanilla payoff is not twice differentiable at K, so pathwise gamma
-    # uses a common-random-number finite difference around the same simulated Z.
+    # The vanilla payoff is not twice differentiable at K, so pathwise gamma uses a common-random-number finite difference around the same simulated Z.
     ST_up = (S + h) * np.exp((r - q - 0.5 * sigma**2) * T + sigma * sqrt_T * Z)
     ST_down = (S - h) * np.exp((r - q - 0.5 * sigma**2) * T + sigma * sqrt_T * Z)
     call_up = np.maximum(ST_up - K, 0)

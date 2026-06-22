@@ -25,7 +25,6 @@ from Market_Data.yfinance_data import (
     filter_option_chain_by_quality,
     latest_close,
     matched_option_chain_prices,
-    summarize_option_chain_quality,
 )
 from Implied_Volatility.iv_surface import current_otm_surface_iv
 from Option_System.analytics import (
@@ -40,16 +39,6 @@ from Option_System.strategy_engine import (
     build_chain_strategy_legs,
     payoff_grid,
     rolling_strategy_backtest,
-)
-from Option_System.research import (
-    build_research_chain_table,
-    event_straddle_analysis,
-    mispricing_scanner,
-    paper_alerts,
-    strategy_robustness_grid,
-    surface_summary,
-    tear_sheet_metrics,
-    volatility_surface_table,
 )
 from Risk_Management.risk_matrix import OptionLeg, build_risk_matrix, plot_risk_matrix
 from Risk_Management.var_es import ewma_var_es_summary, historical_var_es_summary, iv_smoothed_var_es_summary
@@ -99,6 +88,7 @@ def _load_market_context(
     ticker,
     expiration,
     option_kind,
+    risk_free_rate,
     max_spread_pct,
     min_open_interest,
     min_volume,
@@ -137,17 +127,28 @@ def _load_market_context(
     chain_table["distance_from_spot"] = (chain_table["strike"] - spot).abs()
     chain_table = chain_table.sort_values("distance_from_spot").reset_index(drop=True)
 
+    matched_chain = matched_option_chain_prices(calls_with_mid, puts_with_mid)
+    T = _days_to_years(selected_expiration)
+    try:
+        forward = estimate_forward_price(matched_chain, risk_free_rate, T)["F"]
+        forward_error = None
+    except Exception as exc:
+        forward = None
+        forward_error = str(exc)
+
     return {
         "ticker": ticker,
         "history": history,
         "spot": spot,
+        "forward": forward,
+        "forward_error": forward_error,
         "historical_vol": historical_vol,
         "expirations": expirations,
         "expiration": selected_expiration,
         "chain": chain,
         "calls_with_mid": calls_with_mid,
         "puts_with_mid": puts_with_mid,
-        "matched_chain": matched_option_chain_prices(calls_with_mid, puts_with_mid),
+        "matched_chain": matched_chain,
         "chain_table": chain_table,
     }
 
@@ -160,11 +161,10 @@ def _selected_contract_analytics(context, selected_symbol, option_kind, option_s
     T = _days_to_years(context["expiration"])
     market_price = _mid_price(selected)
     yfinance_iv = float(selected.get("impliedVolatility", 0) or 0)
+    forward = context.get("forward")
     try:
-        forward = estimate_forward_price(context["matched_chain"], risk_free_rate, T)["F"]
-    except Exception:
-        forward = spot
-    try:
+        if forward is None:
+            raise ValueError(context.get("forward_error") or "Market forward is unavailable.")
         model_volatility, model_volatility_source = current_otm_surface_iv(
             context["calls_with_mid"],
             context["puts_with_mid"],
@@ -172,9 +172,9 @@ def _selected_contract_analytics(context, selected_symbol, option_kind, option_s
             float(selected["strike"]),
             T,
         )
-    except ValueError:
+    except ValueError as exc:
         model_volatility = historical_vol
-        model_volatility_source = "Newey-West volatility"
+        model_volatility_source = f"Newey-West volatility; current IV surface unavailable ({exc})"
 
     try:
         model_iv = implied_volatility_from_price(
@@ -293,11 +293,14 @@ def _render_contract_quote(context, analytics, active_ticker, option_style):
     )
 
     selected = analytics["selected"]
-    meta_cols = st.columns(4)
+    meta_cols = st.columns(5)
     meta_cols[0].metric("Spot", f"{context['spot']:.2f}")
     meta_cols[1].metric("Strike", f"{float(selected['strike']):.2f}")
     meta_cols[2].metric("Expiration", context["expiration"])
-    meta_cols[3].metric("Historical vol", f"{context['historical_vol']:.2%}")
+    meta_cols[3].metric("Forward", _format_metric(context.get("forward"), "{:.2f}"))
+    meta_cols[4].metric("Historical vol", f"{context['historical_vol']:.2%}")
+    if context.get("forward_error"):
+        st.warning(f"Could not estimate put-call parity forward: {context['forward_error']}")
 
     display_cols = [
         "contractSymbol",
@@ -314,7 +317,7 @@ def _render_contract_quote(context, analytics, active_ticker, option_style):
     st.dataframe(context["chain_table"][display_cols].head(25), use_container_width=True)
 
 
-def _live_iv_surface_points(context, max_expirations=10):
+def _live_iv_surface_points(context, risk_free_rate, max_expirations=10):
     selected_expiration = context["expiration"]
     expirations = [selected_expiration]
     expirations.extend([expiration for expiration in context["expirations"] if expiration != selected_expiration])
@@ -329,7 +332,7 @@ def _live_iv_surface_points(context, max_expirations=10):
         try:
             forward = estimate_forward_price(matched, risk_free_rate, days_to_expiration / 365)["F"]
         except Exception:
-            forward = context["spot"]
+            continue
 
         for option_kind, table in [("put", puts), ("call", calls)]:
             if table.empty:
@@ -445,12 +448,14 @@ def _render_greek_letters(context, analytics):
             option_kind=option_kind,
             skip_errors=True,
         )
-        forward = estimate_forward_price(context["matched_chain"], risk_free_rate, analytics["T"])["F"]
+        forward = context.get("forward")
+        if forward is None:
+            raise ValueError(context.get("forward_error") or "Market forward is unavailable.")
         svi = fit_svi_smile(smile_x, smile_iv, forward, analytics["T"])
         fig, ax = plt.subplots()
         ax.scatter(smile_x, smile_iv * 100, label="Market IV", s=18)
         ax.plot(svi["smooth_strikes"], svi["smooth_iv"] * 100, label="SVI fit", linewidth=2)
-        ax.axvline(context["spot"], color="gray", linestyle="--", linewidth=1)
+        ax.axvline(forward, color="gray", linestyle="--", linewidth=1, label="Parity forward")
         ax.set_xlabel("Strike")
         ax.set_ylabel("Implied volatility (%)")
         ax.set_title("IV Smile")
@@ -460,7 +465,7 @@ def _render_greek_letters(context, analytics):
         st.warning(f"Could not build SVI IV smile for this option chain: {exc}")
 
     try:
-        surface = _live_iv_surface_points(context)
+        surface = _live_iv_surface_points(context, risk_free_rate)
         if surface.empty:
             st.info("Not enough live OTM IV nodes to draw an IV surface.")
         else:
@@ -513,7 +518,7 @@ def _format_metric(value, fmt="{:.2f}", missing="N/A"):
     return fmt.format(value)
 
 
-def _portfolio_greeks(legs, spot, risk_free_rate, dividend_yield, volatility, time_to_maturity, contract_multiplier):
+def _portfolio_greeks(legs, spot, risk_free_rate, dividend_yield, volatility, time_to_maturity):
     totals = {"delta": 0.0, "gamma": 0.0, "theta_per_day": 0.0, "vega": 0.0, "rho": 0.0}
     total_quantity = 0
     for leg in legs:
@@ -538,7 +543,7 @@ def _portfolio_greeks(legs, spot, risk_free_rate, dividend_yield, volatility, ti
     return totals
 
 
-def _render_portfolio_greeks(legs, context, analytics, contract_multiplier):
+def _render_portfolio_greeks(legs, context, analytics):
     greeks = _portfolio_greeks(
         legs,
         context["spot"],
@@ -546,7 +551,6 @@ def _render_portfolio_greeks(legs, context, analytics, contract_multiplier):
         dividend_yield,
         analytics["model_volatility"],
         analytics["T"],
-        contract_multiplier,
     )
     st.subheader("Strategy Greeks")
     greek_cols = st.columns(5)
@@ -604,7 +608,7 @@ def _render_backtest(
 
     legs = _build_strategy_legs(strategy, analytics["selected"], context["chain"], other_strike, ratio_quantity=ratio_quantity)
     st.dataframe(pd.DataFrame(legs), use_container_width=True)
-    _render_portfolio_greeks(legs, context, analytics, contract_multiplier)
+    _render_portfolio_greeks(legs, context, analytics)
 
     grid = payoff_grid(context["spot"], legs)
     backtest = rolling_strategy_backtest(
@@ -682,7 +686,9 @@ def _render_backtest(
 
 def _live_vol_curve_nodes(context):
     rows = []
-    forward = context["spot"]
+    forward = context.get("forward")
+    if forward is None:
+        return pd.DataFrame()
     for option_kind, table in [("call", context["calls_with_mid"]), ("put", context["puts_with_mid"])]:
         if table.empty:
             continue
@@ -760,8 +766,8 @@ def _render_risk_management(context, analytics):
     st.subheader("Vol Curve Monitor")
     curves = _live_vol_curve_nodes(context)
     if len(curves) >= 4:
-        st.pyplot(plot_vol_curve_monitor(curves, expiry=context["expiration"], forward=context["spot"]))
-        diagnostics, curve_summary = vol_curve_diagnostics(curves, expiry=context["expiration"], forward=context["spot"])
+        st.pyplot(plot_vol_curve_monitor(curves, expiry=context["expiration"], forward=context["forward"]))
+        diagnostics, curve_summary = vol_curve_diagnostics(curves, expiry=context["expiration"], forward=context["forward"])
         curve_cols = st.columns(4)
         curve_cols[0].metric("ATM IV", f"{curve_summary['atm_iv_pct']:.2f}%")
         curve_cols[1].metric("IV range", f"{curve_summary['iv_range_pct']:.2f} vol pts")
@@ -817,6 +823,7 @@ try:
         ticker,
         expiration,
         option_kind,
+        risk_free_rate,
         max_spread_pct,
         min_open_interest,
         min_volume,
