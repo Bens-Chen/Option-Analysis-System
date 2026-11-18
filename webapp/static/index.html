@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Option Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/vendor/plotly-2.35.2.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">◆</span> Option Lab</div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-view="calc">定價計算器</button>
+      <button class="tab" data-view="us">美股選擇權</button>
+      <button class="tab" data-view="tw">台股權證</button>
+    </nav>
+    <button id="theme-toggle" class="icon-btn" title="切換深淺色">◐</button>
+  </header>
+
+  <main>
+    <!-- ============ Calculator ============ -->
+    <section id="view-calc" class="view active">
+      <div class="layout">
+        <form id="calc-form" class="panel form">
+          <h2>合約參數</h2>
+          <div class="seg" data-name="kind">
+            <button type="button" class="on" data-value="call">Call 認購</button>
+            <button type="button" data-value="put">Put 認售</button>
+          </div>
+          <label>標的價格 S<input name="S" type="number" step="any" value="100"></label>
+          <label>履約價 K<input name="K" type="number" step="any" value="100"></label>
+          <label>波動率 σ (%)<input name="sigma" type="number" step="any" value="30"></label>
+          <label>剩餘天數<input name="days" type="number" step="1" value="90"></label>
+          <label>無風險利率 r (%)<input name="r" type="number" step="any" value="1.5"></label>
+          <label>股利率 q (%)<input name="q" type="number" step="any" value="0"></label>
+          <label>行使比例<input name="ratio" type="number" step="any" value="1"><small>權證填 TEJ「目前行使比例」，選擇權填 1</small></label>
+          <h2>模型</h2>
+          <div class="seg" data-name="model">
+            <button type="button" class="on" data-value="bs">Black-Scholes</button>
+            <button type="button" data-value="crr">CRR 二元樹</button>
+          </div>
+          <div class="seg" data-name="style">
+            <button type="button" class="on" data-value="european">歐式</button>
+            <button type="button" data-value="american">美式</button>
+          </div>
+        </form>
+
+        <div class="content">
+          <div class="kpis" id="calc-kpis"></div>
+          <div class="panel">
+            <div class="panel-head"><h3>價格曲線</h3><span class="hint">隨標的價格變化</span></div>
+            <div id="calc-chart" class="chart"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>Delta 與 Gamma</h3></div>
+            <div id="calc-greeks-chart" class="chart short"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ US options ============ -->
+    <section id="view-us" class="view">
+      <form id="us-form" class="toolbar panel">
+        <label>代號<input name="ticker" value="AAPL" autocomplete="off"></label>
+        <label>到期日<select name="expiration"><option value="">自動（≥7 天）</option></select></label>
+        <label>r (%)<input name="r" type="number" step="any" value="4"></label>
+        <label>q (%)<input name="q" type="number" step="any" value="0"></label>
+        <button class="primary" type="submit">載入</button>
+        <span class="status" id="us-status"></span>
+      </form>
+      <div class="kpis" id="us-kpis"></div>
+
+      <div class="subtabs" id="us-subtabs">
+        <button class="subtab active" data-sub="quote">報價與微笑</button>
+        <button class="subtab" data-sub="surface">IV 曲面</button>
+        <button class="subtab" data-sub="strategy">策略回測</button>
+        <button class="subtab" data-sub="risk">風險管理</button>
+        <span class="selected-contract" id="us-selected"></span>
+      </div>
+
+      <div class="sub active" data-sub="quote">
+        <div class="panel">
+          <div class="panel-head"><h3>波動率微笑</h3><span class="hint" id="us-smile-hint">價外合約的自算 IV、SVI 擬合與 yfinance IV</span></div>
+          <div id="us-smile" class="chart"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>選擇權鏈</h3><span class="hint">點選 Call 或 Put 那一側即可選定合約，供策略回測與風險管理使用</span></div>
+          <div class="table-wrap"><table id="us-chain" class="chain"></table></div>
+        </div>
+      </div>
+
+      <div class="sub" data-sub="surface">
+        <div class="panel">
+          <div class="panel-head"><h3>隱含波動率曲面</h3><span class="hint" id="us-surface-hint">使用前幾個到期日的價外合約</span></div>
+          <div class="toolbar inline">
+            <label>到期日數量<input id="us-surface-n" type="number" min="2" max="15" value="8"></label>
+            <button class="primary" id="us-surface-load" type="button">建立曲面</button>
+            <span class="status" id="us-surface-status"></span>
+          </div>
+          <div id="us-surface" class="chart tall"></div>
+        </div>
+      </div>
+
+      <div class="sub" data-sub="strategy">
+        <form id="us-strategy-form" class="panel toolbar">
+          <label>策略<select name="strategy" id="us-strategy-select"></select></label>
+          <label id="us-width-label">寬度 / 第二履約價差<input name="width" type="number" step="any" placeholder="自動"></label>
+          <label id="us-ratio-label" hidden>賣出 Call 數量<input name="ratio_quantity" type="number" min="2" value="2"></label>
+          <label>持有天數<input name="holding_days" type="number" min="1" max="252" value="20"></label>
+          <label>初始資金<input name="initial_capital" type="number" value="100000"></label>
+          <label>合約乘數<input name="multiplier" type="number" value="100"></label>
+          <label>手續費 / 口<input name="commission" type="number" step="any" value="0.65"></label>
+          <label>滑價 / 口<input name="slippage" type="number" step="any" value="0.01"></label>
+          <label class="check"><input name="non_overlapping" type="checkbox" checked> 不重疊交易</label>
+          <button class="primary" type="submit">執行回測</button>
+          <span class="status" id="us-strategy-status"></span>
+          <div id="us-custom" class="custom-legs" hidden>
+            <label>自訂部位（每行：類型,方向,履約價,權利金,數量）<textarea name="custom" rows="3">call,long,100,5,1
+put,long,95,4,1</textarea></label>
+          </div>
+        </form>
+        <div id="us-strategy-out" hidden>
+          <div class="kpis" id="us-strategy-kpis"></div>
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-head"><h3>部位</h3><span class="hint" id="us-legs-hint"></span></div>
+              <div class="table-wrap"><table id="us-legs" class="data"></table></div>
+              <div class="kpis compact" id="us-strategy-greeks"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h3>到期損益</h3></div>
+              <div id="us-payoff" class="chart"></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>滾動回測</h3><span class="hint">每個進場日以相同價內外程度重建策略，用 BS 與滾動歷史波動率估價（yfinance 沒有歷史選擇權報價）</span></div>
+            <div id="us-backtest" class="chart"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sub" data-sub="risk">
+        <div class="panel toolbar">
+          <label class="check"><input id="us-risk-use-strategy" type="checkbox"> 使用策略回測的部位（否則為選定的單一合約）</label>
+          <label>壓力情境持有天數<input id="us-risk-days" type="number" min="1" max="252" value="20"></label>
+          <button class="primary" id="us-risk-run" type="button">計算風險</button>
+          <span class="status" id="us-risk-status"></span>
+        </div>
+        <div id="us-risk-out" hidden>
+          <div class="kpis" id="us-var-kpis"></div>
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-head"><h3>價格衝擊損益</h3><span class="hint">衝擊幅度取自歷史報酬分位數</span></div>
+              <div id="us-risk-chart" class="chart"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h3>風險矩陣</h3><span class="hint">含合約乘數</span></div>
+              <div class="table-wrap"><table id="us-risk-table" class="data plain"></table></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>波動率曲線監控</h3><span class="hint" id="us-curve-hint">曲率越大，代表 IV 在該履約價彎得越急</span></div>
+            <div class="kpis compact" id="us-curve-kpis"></div>
+            <div id="us-curve-chart" class="chart"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Taiwan warrants ============ -->
+    <section id="view-tw" class="view">
+      <form id="tw-upload" class="toolbar panel">
+        <label class="file">TEJ 權證日交易表 <b>*</b><input type="file" name="daily" accept=".xlsx,.xls,.csv" required></label>
+        <label class="file">TEJ 權證條款表<input type="file" name="terms" accept=".xlsx,.xls,.csv"></label>
+        <label>r (%)<input name="r" type="number" step="any" value="1.5"></label>
+        <button class="primary" type="submit">上傳並分析</button>
+        <span class="status" id="tw-status"></span>
+      </form>
+
+      <div id="tw-empty" class="empty panel">
+        <h3>上傳 TEJ 匯出檔開始分析</h3>
+        <p>日交易表必填；加上條款表才有行使比例，才能計算自有 IV 與 Delta（否則只顯示 TEJ 的 IV）。</p>
+        <p>系統會依事件日套用當時有效的履約價與行使比例，不會用到重設後的未來資訊。</p>
+      </div>
+
+      <div id="tw-main" hidden>
+        <div class="kpis" id="tw-kpis"></div>
+        <div class="toolbar panel filters">
+          <label>標的<select id="f-underlying"><option value="">全部</option></select></label>
+          <label>發行商<select id="f-issuer"><option value="">全部</option></select></label>
+          <label>類型<select id="f-kind"><option value="">全部</option><option value="call">認購</option><option value="put">認售</option></select></label>
+          <label>最少剩餘天數<input id="f-days" type="number" value="0"></label>
+          <label class="check"><input id="f-traded" type="checkbox" checked> 只看當日有成交</label>
+          <label>日期<input id="f-date" type="date"></label>
+        </div>
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head"><h3>各發行商 IV 分布</h3><span class="hint">同標的比較，越低越便宜</span></div>
+            <div id="tw-issuer-chart" class="chart"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3 id="tw-series-title">單檔走勢</h3><span class="hint">點選下方表格中的權證</span></div>
+            <div id="tw-series-chart" class="chart"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>權證清單</h3><span class="hint" id="tw-count"></span></div>
+          <div class="table-wrap"><table id="tw-table" class="data"></table></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
