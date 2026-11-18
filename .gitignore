@@ -13,3 +13,6 @@ env/
 .ipynb_checkpoints/
 
 .DS_Store
+
+*.egg-info/
+shioaji.log
