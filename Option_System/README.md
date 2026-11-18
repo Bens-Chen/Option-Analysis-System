@@ -1,11 +1,11 @@
 # Option Analysis System
 
-This folder contains the interactive system for searching option contracts, viewing IV and Greek letters, plotting strategy payoff, and running a model rolling strategy backtest.
+This folder contains the analysis logic for searching option contracts, viewing IV and Greek letters, plotting strategy payoff, and running a model rolling strategy backtest.
 
-Run it with:
+The interface is the Option Lab web app (`webapp/`), which replaced the old Streamlit app:
 
 ```bash
-streamlit run Option_System/app.py
+python -m webapp
 ```
 
 ## What the System Does
@@ -23,7 +23,7 @@ streamlit run Option_System/app.py
 
 ## Research Platform Features
 
-The app now includes a first research-platform layer:
+`research.py` provides a first research-platform layer:
 
 - Volatility surface table: current yfinance IV by expiration and moneyness bucket.
 - Surface summary: ATM IV, 90%-110% skew, term-structure slope, and an IV-rank proxy.
