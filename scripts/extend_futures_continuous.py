@@ -14,7 +14,8 @@ Conventions copied from the base files:
 * Backward adjustment: the newest segment is unadjusted; every older row gets the new gaps added
   (diff) / multiplied (ratio) on top of its existing adjustment.
 
-Usage: python scripts/extend_futures_continuous.py --root ../data/futures_continuous --end 2026-11-18
+Usage: python scripts/extend_futures_continuous.py --root ../data/futures_continuous --end YYYY-MM-DD
+Output: <root>/{TX,MTX,TMF}_continuous_1m_post_latest.parquet and *_new_rolls_latest.csv
 """
 
 import argparse
@@ -57,7 +58,7 @@ def trade_dates(ts, session, trading_days):
     after_15 = (ts.dt.hour >= 15).to_numpy()
     # first trading day strictly after the calendar date (evening) / on or after it (early morning)
     idx = np.where(after_15, np.searchsorted(days, cal, side="right"), np.searchsorted(days, cal, side="left"))
-    night = np.where(idx < len(days), days[np.minimum(idx, len(days) - 1)], np.datetime64("NaT"))
+    night = np.where(idx < len(days), days[np.minimum(idx, len(days) - 1)], np.datetime64("NaT", "ns"))
     return pd.to_datetime(np.where(session == "position", cal, night)).date
 
 
@@ -166,9 +167,9 @@ def main(argv=None):
         gaps = roll_gaps(pd.concat([base.tail(1)[["ts", "contract"]], new[["ts", "contract"]]], ignore_index=True), r1, r2)
         out = extend(base, new, gaps)
 
-        tag = pd.Timestamp(args.end).strftime("%Y%m%d")
-        out.to_parquet(root / f"{her}_continuous_1m_post_to_{tag}.parquet", index=False)
-        gaps.to_csv(root / f"{her}_new_rolls_to_{tag}.csv", index=False)
+        # fixed names so a daily run replaces yesterday's file instead of adding a new one
+        out.to_parquet(root / f"{her}_continuous_1m_post_latest.parquet", index=False)
+        gaps.to_csv(root / f"{her}_new_rolls_latest.csv", index=False)
         print(f"  rows {len(base):,} + {len(new):,} = {len(out):,}; {out['ts'].min()} ~ {out['ts'].max()}")
         print("  new rolls:", gaps[["roll_ts", "from_contract", "to_contract", "gap_points", "same_minute"]].to_dict("records"))
 
