@@ -2,10 +2,17 @@
 # Daily after-close data update. Scheduled by ~/Library/LaunchAgents/com.optionlab.daily-update.plist.
 # Credentials are read from ENV_FILE by the Python scripts and never printed; Shioaji output is
 # filtered before it reaches the log.
+# Machine-specific paths (DATA, ENV_FILE, WTOX) live in scripts/daily_update.local, which is
+# git-ignored; copy scripts/daily_update.local.example to create it.
 set -u
-REPO="/Users/a000/Desktop/權證/Option-Analysis-System"
-DATA="/Users/a000/Desktop/權證/data"
-ENV_FILE="/Users/a000/Desktop/SinoPac Trading/.env"
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+LOCAL_CONF="$REPO/scripts/daily_update.local"
+if [[ ! -f "$LOCAL_CONF" ]]; then
+    echo "Missing $LOCAL_CONF (copy scripts/daily_update.local.example and fill in your paths)" >&2
+    exit 1
+fi
+source "$LOCAL_CONF"
+: "${DATA:?set DATA in daily_update.local}" "${ENV_FILE:?set ENV_FILE in daily_update.local}" "${WTOX:?set WTOX in daily_update.local}"
 PY="$REPO/.venv/bin/python"
 LOG_DIR="$DATA/logs"
 TODAY=$(date +%F)
@@ -35,7 +42,6 @@ run "$PY" scripts/extend_futures_continuous.py --root "$DATA/futures_continuous"
 
 step "Rebuild TSMC warrant trade panel (new days only)"
 # the panel builder lives in the standalone warrant-toxicity repo
-WTOX="/Users/a000/Desktop/權證/warrant-toxicity"
 (cd "$WTOX" && run "$WTOX/.venv/bin/python" -m wtox.research.trades --data "$DATA" --out "$DATA/panel/tsmc_warrant_trades")
 
 echo "\n== done ($(date +%T))" >> "$LOG"

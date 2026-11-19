@@ -16,3 +16,6 @@ env/
 
 *.egg-info/
 shioaji.log
+
+# machine-specific paths for scripts/daily_update.sh
+scripts/daily_update.local

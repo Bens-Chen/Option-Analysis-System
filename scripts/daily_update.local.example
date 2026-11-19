@@ -1,0 +1,4 @@
+# Copy to scripts/daily_update.local (git-ignored) and set your own paths.
+DATA="/path/to/data"                      # shared data folder (TEJ / Shioaji / TWSE / panels)
+ENV_FILE="/path/to/.env"                  # holds SJ_API_KEY / SJ_SEC_KEY; never commit it
+WTOX="/path/to/warrant-toxicity"          # standalone repo that builds the warrant trade panel
